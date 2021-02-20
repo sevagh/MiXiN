@@ -1,0 +1,8 @@
+scipy
+librosa
+numpy
+git+git://github.com/sevagh/nsgt#egg=nsgt
+keras
+tensorflow>=2.2
+h5py
+matplotlib

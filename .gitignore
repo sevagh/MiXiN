@@ -1,0 +1,6 @@
+*.wav
+*.hdf5
+__pycache__
+*.pyc
+/logdir
+/model
