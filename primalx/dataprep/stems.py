@@ -1,57 +1,25 @@
-#!/usr/bin/env python3
-
-import sys
-import argparse
 import os
 import numpy
-import subprocess
+import json
 from essentia.standard import MonoLoader
 import soundfile
 
-data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+mypath = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(mypath, '../../params.json')) as f:
+    params = json.load(f)
+sample_rate = params["sample_rate"]
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        prog="prepare_data",
-        description="Prepare evaluation datasets for HPSS from instrument stems",
-    )
-    parser.add_argument(
-        "--sample-rate",
-        type=int,
-        default=44100,
-        help="sample rate (default: 44100 Hz)",
-    )
-    parser.add_argument(
-        "stem_dirs", nargs="+", help="directories containing instrument stems"
-    )
-    parser.add_argument("--track-limit", type=int, default=-1, help="limit to n tracks")
-    parser.add_argument(
-        "--segment-limit",
-        type=int,
-        default=sys.maxsize,
-        help="limit to n segments per track",
-    )
-    parser.add_argument(
-        "--segment-offset",
-        type=int,
-        default=0,
-        help="offset of segment to start from (useful to skip intros)",
-    )
-    parser.add_argument(
-        "--segment-duration", type=float, default=30.0, help="segment duration in seconds"
-    )
-    return parser.parse_args()
-
-
-def main():
-    args = parse_args()
-
+'''
+take path to instrument stems
+prepare vocal and non-vocal mixes
+'''
+def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_limit, segment_offset):
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
 
     seq = 0
-    for sd in args.stem_dirs:
+    for sd in stem_dirs:
         for song in os.scandir(sd):
             for dir_name, _, file_list in os.walk(song):
                 instruments = [
@@ -74,7 +42,7 @@ def main():
 
                         # automatically resamples for us
                         loaded_wavs[i] = MonoLoader(
-                            filename=instrument, sampleRate=args.sample_rate
+                            filename=instrument, sampleRate=sample_rate
                         )()
                     track_len = len(loaded_wavs[0])
 
@@ -101,13 +69,13 @@ def main():
                     full_mix_novocal = interf_mix_novocal + loaded_wavs[drum_track_index]
                     full_mix_vocal = interf_mix_vocal + loaded_wavs[drum_track_index]
 
-                    seg_samples = int(numpy.floor(args.segment_duration * args.sample_rate))
+                    seg_samples = int(numpy.floor(segment_duration * sample_rate))
                     total_segs = int(numpy.floor(track_len / seg_samples))
 
-                    seg_limit = min(total_segs - 1, args.segment_limit)
+                    seg_limit = min(total_segs - 1, segment_limit)
 
                     for seg in range(seg_limit):
-                        if seg < args.segment_offset:
+                        if seg < segment_offset:
                             continue
                         seqstr = "%03d%04d" % (seq, seg)
 
@@ -132,17 +100,17 @@ def main():
                         )
 
                         soundfile.write(
-                            harm_path_nov, interf_mix_novocal[left:right], args.sample_rate
+                            harm_path_nov, interf_mix_novocal[left:right], sample_rate
                         )
                         soundfile.write(
-                            mix_path_nov, full_mix_novocal[left:right], args.sample_rate
+                            mix_path_nov, full_mix_novocal[left:right], sample_rate
                         )
 
                         # write the drum track
                         soundfile.write(
                             perc_path_nov,
                             loaded_wavs[drum_track_index][left:right],
-                            args.sample_rate,
+                            sample_rate,
                         )
 
                         harm_path_v = os.path.join(
@@ -154,27 +122,24 @@ def main():
                         )
 
                         soundfile.write(
-                            harm_path_v, interf_mix_vocal[left:right], args.sample_rate
+                            harm_path_v, interf_mix_vocal[left:right], sample_rate
                         )
                         soundfile.write(
-                            mix_path_v, full_mix_vocal[left:right], args.sample_rate
+                            mix_path_v, full_mix_vocal[left:right], sample_rate
                         )
 
                         # write the drum track
                         soundfile.write(
                             perc_path_v,
                             loaded_wavs[drum_track_index][left:right],
-                            args.sample_rate,
+                            sample_rate,
                         )
 
                     seq += 1
+                    print('wrote seq {0}'.format(seq))
 
-                    if args.track_limit > -1:
-                        if seq == args.track_limit:
+                    if track_limit > -1:
+                        if seq == track_limit:
                             return 0
 
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from bsseval import evaluate
 import os
 import sys
@@ -17,26 +15,11 @@ data_dir = os.path.join(mypath, "./data/")
 bss_metric_names = ["SDR", "ISR", "SIR", "SAR"]
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        prog="bss4_eval",
-        description="Evaluate MATLAB results using BSS4 eval",
-    )
-    parser.add_argument(
-        "--seg-len-samples",
-        type=int,
-        default=2*661500,
-        help="segment length in samples (default: 30s)",
-    )
-    return parser.parse_args()
-
-
 def eval_hpss(
-    harm_estimates, harm_references, perc_estimates, perc_references, n_segs, seg_len
+    drum_estimates, drum_references, other_references, n_segs, seg_len
 ):
-    total = {'interf_bss': {}, 'drum_bss': {}}
-
-    bss_results = numpy.zeros(dtype=numpy.float32, shape=(n_segs, 4, 2))
+    drum_bss = {}
+    bss_results = numpy.zeros(dtype=numpy.float32, shape=(n_segs, 4, 1))
 
     n_seg = 0
     for track_prefix in perc_estimates[algo_name].keys():
@@ -66,8 +49,7 @@ def eval_hpss(
         bss_results[n_seg][:] = numpy.asarray(bss_metrics)
         n_seg += 1
 
-    total["harmonic_bss"][algo_name] = {}
-    total["percussive_bss"][algo_name] = {}
+    total["drum_bss"][algo_name] = {}
 
     harm_bss = numpy.nanmedian(bss_results[:, :, 0], axis=0)
 
@@ -78,104 +60,6 @@ def eval_hpss(
 
     for i, bss_metric_name in enumerate(bss_metric_names):
         total["percussive_bss"][algo_name][bss_metric_name] = float(perc_bss[i])
-
-    return total
-
-
-def eval_vocal(
-    harm_estimates,
-    harm_references,
-    perc_estimates,
-    perc_references,
-    vocal_estimates,
-    vocal_references,
-    n_segs,
-    seg_len,
-):
-    total = {}
-    total["harmonic_bss"] = {}
-    total["percussive_bss"] = {}
-    total["vocal_bss"] = {}
-
-    for algo_name in perc_estimates.keys():
-        print()
-        print("\tEVALUATING ALGO {0}".format(algo_name))
-
-        bss_results = numpy.zeros(dtype=numpy.float32, shape=(n_segs, 4, 3))
-
-        n_seg = 0
-        for track_prefix in perc_estimates[algo_name].keys():
-            if n_seg >= n_segs:
-                break
-            cum_est_per_algo = numpy.zeros(dtype=numpy.float32, shape=(3, seg_len, 1))
-            cum_ref_per_algo = numpy.zeros(dtype=numpy.float32, shape=(3, seg_len, 1))
-
-            harm_ref = harm_references[track_prefix]
-            harm_est = harm_estimates[algo_name][track_prefix]
-            loaded_harm_ref = MonoLoader(filename=harm_ref)().reshape(seg_len, 1)
-            loaded_harm_est = MonoLoader(filename=harm_est)().reshape(seg_len, 1)
-
-            cum_est_per_algo[0] = loaded_harm_est
-            cum_ref_per_algo[0] = loaded_harm_ref
-
-            perc_ref = perc_references[track_prefix]
-            perc_est = perc_estimates[algo_name][track_prefix]
-            loaded_perc_ref = MonoLoader(filename=perc_ref)().reshape(seg_len, 1)
-            loaded_perc_est = MonoLoader(filename=perc_est)().reshape(seg_len, 1)
-
-            cum_est_per_algo[1] = loaded_perc_est
-            cum_ref_per_algo[1] = loaded_perc_ref
-
-            novoc = False
-
-            try:
-                vocal_ref = vocal_references[track_prefix]
-                vocal_est = vocal_estimates[algo_name][track_prefix]
-                loaded_vocal_ref = MonoLoader(filename=vocal_ref)().reshape(seg_len, 1)
-                loaded_vocal_est = MonoLoader(filename=vocal_est)().reshape(seg_len, 1)
-
-                cum_est_per_algo[2] = loaded_vocal_est
-                cum_ref_per_algo[2] = loaded_vocal_ref
-            except:
-                # an hpss algorithm with no vocal output
-                novoc = True
-                pass
-
-            if novoc:
-                # slice off vocal part
-                cum_ref_per_algo = cum_ref_per_algo[:-1]
-                cum_est_per_algo = cum_est_per_algo[:-1]
-
-            bss_metrics_segs = evaluate(cum_ref_per_algo, cum_est_per_algo)
-            bss_metrics = numpy.nanmedian(bss_metrics_segs, axis=2)
-
-            if novoc:
-                empties = numpy.empty(shape=(4, 1))
-                empties[:] = numpy.nan
-                adjusted_metrics = numpy.concatenate((bss_metrics, empties), axis=1)
-                bss_results[n_seg][:] = numpy.asarray(adjusted_metrics)
-            else:
-                bss_results[n_seg][:] = numpy.asarray(bss_metrics)
-            n_seg += 1
-
-        total["harmonic_bss"][algo_name] = {}
-        total["percussive_bss"][algo_name] = {}
-        total["vocal_bss"][algo_name] = {}
-
-        harm_bss = numpy.nanmedian(bss_results[:, :, 0], axis=0)
-
-        for i, bss_metric_name in enumerate(bss_metric_names):
-            total["harmonic_bss"][algo_name][bss_metric_name] = float(harm_bss[i])
-
-        perc_bss = numpy.nanmedian(bss_results[:, :, 1], axis=0)
-
-        for i, bss_metric_name in enumerate(bss_metric_names):
-            total["percussive_bss"][algo_name][bss_metric_name] = float(perc_bss[i])
-
-        vocal_bss = numpy.nanmedian(bss_results[:, :, 2], axis=0)
-
-        for i, bss_metric_name in enumerate(bss_metric_names):
-            total["vocal_bss"][algo_name][bss_metric_name] = float(vocal_bss[i])
 
     return total
 

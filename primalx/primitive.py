@@ -1,6 +1,7 @@
 import numpy
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 import scipy.io.wavfile
+import json
 import librosa
 from librosa.decompose import hpss
 from librosa.core import stft, istft
@@ -8,8 +9,14 @@ from librosa.util import fix_length
 from scipy.signal import medfilt
 import os
 
+mypath = os.path.dirname(os.path.abspath(__file__))
 
-def xtract_primitive(x, fs, chunk_size):
+with open(os.path.join(mypath, '../params.json')) as f:
+    params = json.load(f)
+    chunk_size = params["chunk_size"]
+
+
+def xtract_primitive(x, fs):
     n_samples = x.shape[0]
     n_chunks = int(numpy.ceil(n_samples/chunk_size))
     n_pad = n_chunks*chunk_size - x.shape[0]

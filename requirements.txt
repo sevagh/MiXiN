@@ -7,3 +7,4 @@ tensorflow>=2.2
 h5py
 matplotlib
 soundfile
+essentia

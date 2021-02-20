@@ -11,7 +11,6 @@ import scipy
 if __name__ == '__main__':
     parser = ArgumentParser()
 
-    parser.add_argument("--chunk", type=int, default=44032, help="chunk size in samples, roughly 1s but divisible by 1024, (default=%(default)s")
     parser.add_argument("--use-nn", action="store_true" , help="use trained neural network vs plain/primitive separation")
     parser.add_argument("input", type=str, help="input audio file")
     parser.add_argument('output', type=str, help="output audio file")
@@ -25,9 +24,9 @@ if __name__ == '__main__':
 
     x_out = numpy.zeros_like(x)
     if args.use_nn:
-        x_out = xtract_primal(x, fs, args.chunk)
+        x_out = xtract_primal(x, fs)
     else:
-        x_out = xtract_primitive(x, fs, args.chunk)
+        x_out = xtract_primitive(x, fs)
 
     print("Writing audio file '%s'"%args.output)
     scipy.io.wavfile.write(args.output, fs, x_out)
