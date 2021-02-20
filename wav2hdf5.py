@@ -61,16 +61,11 @@ def compute_single_testcase(mixref_tup, chunk_size):
         x_sep_chunk = x_sep[chunk*chunk_size:(chunk+1)*chunk_size]
         x_ref_chunk = x_ref[chunk*chunk_size:(chunk+1)*chunk_size]
 
-        Xsep = stft(x_sep_chunk, win_length=perc_time_win, hop_length=int(0.5*perc_time_win))
+        Xsep = stft(x_sep_chunk, n_fft=2*perc_time_win, win_length=perc_time_win, hop_length=int(0.5*perc_time_win))
         Xsepmag = numpy.abs(Xsep)
 
-        Xref = stft(x_ref_chunk, win_length=perc_time_win, hop_length=int(0.5*perc_time_win))
+        Xref = stft(x_ref_chunk, n_fft=2*perc_time_win, win_length=perc_time_win, hop_length=int(0.5*perc_time_win))
         Xrefmag = numpy.abs(Xref)
-
-        print(Xrefmag.shape)
-        print(Xrefmag.dtype)
-        print(Xsepmag.shape)
-        print(Xsepmag.dtype)
 
         spec_in.append(Xsepmag)
         spec_out.append(Xrefmag)

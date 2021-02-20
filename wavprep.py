@@ -39,7 +39,7 @@ def parse_args():
         help="offset of segment to start from (useful to skip intros)",
     )
     parser.add_argument(
-        "--segment-size", type=float, default=30.0, help="segment size in seconds"
+        "--segment-duration", type=float, default=30.0, help="segment duration in seconds"
     )
     return parser.parse_args()
 
@@ -101,7 +101,7 @@ def main():
                     full_mix_novocal = interf_mix_novocal + loaded_wavs[drum_track_index]
                     full_mix_vocal = interf_mix_vocal + loaded_wavs[drum_track_index]
 
-                    seg_samples = int(numpy.floor(args.segment_size * args.sample_rate))
+                    seg_samples = int(numpy.floor(args.segment_duration * args.sample_rate))
                     total_segs = int(numpy.floor(track_len / seg_samples))
 
                     seg_limit = min(total_segs - 1, args.segment_limit)

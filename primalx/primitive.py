@@ -1,9 +1,3 @@
-"""
-origin is https://github.com/grrr/nsgt
-
-Thomas Grill, 2011-2020
-http://grrrr.org/nsgt
-"""
 import numpy
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 import scipy.io.wavfile

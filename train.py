@@ -29,8 +29,8 @@ checkpoint_file = os.path.join(checkpoint_dir, "model.ckpt")
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--plot", action="store_true", help="generate training plots")
     parser.add_argument("data_file", help="hdf5 file with training data")
-    parser.add_argument("plot", action="store_true", help="generate training plots")
     return parser.parse_args()
 
 
@@ -68,9 +68,6 @@ def main():
 
         X = numpy.copy(data[:, :1025, :])
         Y = numpy.copy(data[:, 1025:, :])
-
-        print(X.shape)
-        print(Y.shape)
 
         # split into 90/10. then pass validation_split to keras fit
         X_train, X_test, Y_train, Y_test = train_test_split(

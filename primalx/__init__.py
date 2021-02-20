@@ -1,2 +1,2 @@
 from .primitive import xtract_primitive
-from .model import create_model
+from .nn_primal import create_model, xtract_primal
