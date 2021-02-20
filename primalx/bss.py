@@ -15,9 +15,7 @@ data_dir = os.path.join(mypath, "./data/")
 bss_metric_names = ["SDR", "ISR", "SIR", "SAR"]
 
 
-def eval_hpss(
-    drum_estimates, drum_references, other_references, n_segs, seg_len
-):
+def eval_hpss(drum_estimates, drum_references, other_references, n_segs, seg_len):
     drum_bss = {}
     bss_results = numpy.zeros(dtype=numpy.float32, shape=(n_segs, 4, 1))
 

@@ -5,16 +5,20 @@ from essentia.standard import MonoLoader
 import soundfile
 
 mypath = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(mypath, '../../params.json')) as f:
+with open(os.path.join(mypath, "../../params.json")) as f:
     params = json.load(f)
 sample_rate = params["sample_rate"]
 
 
-'''
+"""
 take path to instrument stems
 prepare vocal and non-vocal mixes
-'''
-def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_limit, segment_offset):
+"""
+
+
+def prepare_stems(
+    stem_dirs, data_dir, track_limit, segment_duration, segment_limit, segment_offset
+):
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
 
@@ -64,9 +68,13 @@ def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_li
                             ]
                         ]
                     )
-                    interf_mix_vocal = interf_mix_novocal + loaded_wavs[vocal_track_index] 
+                    interf_mix_vocal = (
+                        interf_mix_novocal + loaded_wavs[vocal_track_index]
+                    )
 
-                    full_mix_novocal = interf_mix_novocal + loaded_wavs[drum_track_index]
+                    full_mix_novocal = (
+                        interf_mix_novocal + loaded_wavs[drum_track_index]
+                    )
                     full_mix_vocal = interf_mix_vocal + loaded_wavs[drum_track_index]
 
                     seg_samples = int(numpy.floor(segment_duration * sample_rate))
@@ -91,13 +99,9 @@ def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_li
                         left = seg * seg_samples
                         right = (seg + 1) * seg_samples
 
-                        harm_path_nov = os.path.join(
-                            seqdirnov, "interf.wav"
-                        )
+                        harm_path_nov = os.path.join(seqdirnov, "interf.wav")
                         mix_path_nov = os.path.join(seqdirnov, "mix.wav")
-                        perc_path_nov = os.path.join(
-                            seqdirnov, "drum.wav"
-                        )
+                        perc_path_nov = os.path.join(seqdirnov, "drum.wav")
 
                         soundfile.write(
                             harm_path_nov, interf_mix_novocal[left:right], sample_rate
@@ -113,13 +117,9 @@ def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_li
                             sample_rate,
                         )
 
-                        harm_path_v = os.path.join(
-                            seqdirv, "interf.wav"
-                        )
+                        harm_path_v = os.path.join(seqdirv, "interf.wav")
                         mix_path_v = os.path.join(seqdirv, "mix.wav")
-                        perc_path_v = os.path.join(
-                            seqdirv, "drum.wav"
-                        )
+                        perc_path_v = os.path.join(seqdirv, "drum.wav")
 
                         soundfile.write(
                             harm_path_v, interf_mix_vocal[left:right], sample_rate
@@ -136,7 +136,7 @@ def prepare_stems(stem_dirs, data_dir, track_limit, segment_duration, segment_li
                         )
 
                     seq += 1
-                    print('wrote seq {0}'.format(seq))
+                    print("wrote seq {0}".format(seq))
 
                     if track_limit > -1:
                         if seq == track_limit:
