@@ -2,23 +2,18 @@
 
 import librosa
 import os
-from primalx import xtract_primal
-from primalx.params import sample_rate
+from mixin import xtract_mixin
+from mixin.params import sample_rate
 from argparse import ArgumentParser
 import scipy
+import scipy.io.wavfile
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
 
     parser.add_argument(
-        "--beta",
-        default=None,
-        type=float,
-        help="hard mask separation factor, default %(default)s",
-    )
-    parser.add_argument(
-        "--power", default=None, type=float, help="soft mask power, default %(default)s"
+        "--power", default=2.0, type=float, help="soft mask power, default %(default)s"
     )
     parser.add_argument(
         "--instrumental",
@@ -30,6 +25,12 @@ if __name__ == "__main__":
         action="store_true",
         help="use the single model approach (invert network output magnitude + original phase)",
     )
+    parser.add_argument(
+        "--pretrained-model-dir",
+        type=str,
+        default=None,
+        help="path to pretrained model directory (default of None uses ./model)",
+    )
     parser.add_argument("input", type=str, help="input audio file")
 
     args = parser.parse_args()
@@ -39,15 +40,21 @@ if __name__ == "__main__":
     # Read audio data
     x, _ = librosa.load(args.input, sr=sample_rate, mono=True)
 
-    x_h_out, x_p_out, x_v_out = xtract_primal(
-        x, instrumental=args.instrumental, power=args.power, beta=args.beta
+    x_h_out, x_p_out, x_v_out = xtract_mixin(
+        x,
+        instrumental=args.instrumental,
+        power=args.power,
+        single_model=args.single_model,
+        pretrained_model_dir=args.pretrained_model_dir,
     )
 
+    song_name = os.path.splitext(os.path.basename(args.input))[0]
+
     print("Writing harmonic and percussive audio files")
-    scipy.io.wavfile.write("harmonic.wav", sample_rate, x_h_out)
-    scipy.io.wavfile.write("percussive.wav", sample_rate, x_p_out)
+    scipy.io.wavfile.write("{0}_harmonic.wav".format(song_name), sample_rate, x_h_out)
+    scipy.io.wavfile.write("{0}_percussive.wav".format(song_name), sample_rate, x_p_out)
 
     if not args.instrumental:
         print("Writing vocal audio files")
-        scipy.io.wavfile.write("vocal.wav", sample_rate, x_v_out)
+        scipy.io.wavfile.write("{0}_vocal.wav".format(song_name), sample_rate, x_v_out)
     print("Done")

@@ -1,8 +1,8 @@
 black:
-	black *.py primalx/*.py primalx/*/*.py
+	black *.py mixin/*.py mixin/*/*.py
 
 lint:
-	pyflakes *.py primalx/*.py primalx/*/*.py | grep -v '__init__.py'
+	pyflakes *.py mixin/*.py mixin/*/*.py | grep -v '__init__.py'
 
 fmt: black
 

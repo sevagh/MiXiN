@@ -6,12 +6,11 @@ import multiprocessing
 import argparse
 import os
 import numpy
-import shutil
 import itertools
 import tensorflow_io as tfio
 import tensorflow as tf
-from primalx import Model
-from primalx.params import (
+from mixin import Model
+from mixin.params import (
     data_dir,
     model_dir,
     checkpoint_dir,
@@ -20,7 +19,7 @@ from primalx.params import (
     batch_size,
     components,
 )
-from primalx.dataprep import prepare_stems, create_hdf5_from_dir
+from mixin.dataprep import prepare_stems, create_hdf5_from_dir
 
 TRAIN = 0.8
 VALIDATION = 0.1
@@ -63,68 +62,25 @@ def parse_args():
         help="size of python multiprocessing pool (default: %(default)s)",
     )
     parser.add_argument(
-        "--data-clean", action="store_true", help="delete data before re-prepping"
+        "--train",
+        action="store_true",
+        help="train the models",
     )
     parser.add_argument(
-        "--train-clean",
+        "--prepare-stems",
         action="store_true",
-        help="delete model and checkpoints before re-prepping",
+        help=" prepare stems",
     )
     parser.add_argument(
-        "--no-train",
+        "--create-hdf5",
         action="store_true",
-        help="don't train, only data prep",
-    )
-    parser.add_argument(
-        "--no-stems",
-        action="store_true",
-        help="don't prepare stems",
-    )
-    parser.add_argument(
-        "--no-hdf5",
-        action="store_true",
-        help="don't prepare hdf5 file",
+        help="prepare hdf5 file",
     )
 
     return parser.parse_args()
 
 
-def prepare_data(args):
-    if args.data_clean:
-        try:
-            shutil.rmtree(data_dir)
-        except FileNotFoundError:
-            pass
-
-    if not os.path.isdir(data_dir):
-        os.mkdir(data_dir)
-
-    if not args.no_stems:
-        prepare_stems(
-            args.stem_dirs,
-            data_dir,
-            args.track_limit,
-            args.segment_duration,
-            args.segment_limit,
-            args.segment_offset,
-        )
-
-    if not args.no_hdf5:
-        create_hdf5_from_dir(data_dir, args.n_pool)
-
-
 def train_network(args):
-    if args.train_clean:
-        try:
-            shutil.rmtree(model_dir)
-        except FileNotFoundError:
-            pass
-
-        try:
-            shutil.rmtree(checkpoint_dir)
-        except FileNotFoundError:
-            pass
-
     for component, component_files in components.items():
         print("Training model for {0}".format(component))
         model = Model(component_files["model_file"], component_files["checkpoint_file"])
@@ -174,10 +130,29 @@ if __name__ == "__main__":
     args = parse_args()
     print(args)
 
-    if args.stem_dirs is not None:
-        prepare_data(args)
+    if args.prepare_stems:
+        if args.stem_dirs is None:
+            raise ValueError("must specify --stem-dirs with --prepare-stems option")
 
-    if not args.no_train:
+        prepare_stems(
+            args.stem_dirs,
+            data_dir,
+            args.track_limit,
+            args.segment_duration,
+            args.segment_limit,
+            args.segment_offset,
+        )
+    else:
+        print("--prepare-stems not specified, skipping...")
+
+    if args.create_hdf5:
+        create_hdf5_from_dir(data_dir, args.n_pool)
+    else:
+        print("--create-hdf5 not specified, skipping...")
+
+    if args.train:
         train_network(args)
+    else:
+        print("--train not specified, skipping...")
 
     sys.exit(0)

@@ -66,9 +66,8 @@ def _create_model():
 
 
 class Model:
-    def __init__(self, model_file, checkpoint_file):
+    def __init__(self, model_file, checkpoint_file=None):
         self.model_file = model_file
-        self.checkpoint_file = checkpoint_file
         try:
             self.model = load_model(self.model_file)
             self.model.summary()
@@ -85,14 +84,15 @@ class Model:
             monitor="val_loss", patience=2, min_delta=0, mode="auto", verbose=1
         )
 
-        self.checkpoint = ModelCheckpoint(
-            self.checkpoint_file,
-            monitor="val_loss",
-            verbose=1,
-            save_best_only=True,
-            save_weights_only=False,
-            mode="auto",
-        )
+        if checkpoint_file:
+            self.checkpoint = ModelCheckpoint(
+                checkpoint_file,
+                monitor="val_loss",
+                verbose=1,
+                save_best_only=True,
+                save_weights_only=False,
+                mode="auto",
+            )
 
     def train(self, XY_train, XY_val, epochs=100, plot=False):
         history = self.model.fit(
@@ -134,26 +134,22 @@ class Model:
         self.model.summary()
 
 
-def xtract_primal(x, instrumental=False, power=None, beta=None, single_model=False):
-    if (power is None) == (beta is None):
-        raise ValueError(
-            "supply one of power (2.0 = default, soft masking/wiener filter) or beta (2.0 default, separation factor for hard masking)"
-        )
+def xtract_mixin(
+    x, instrumental=False, power=2.0, single_model=False, pretrained_model_dir=None
+):
+    if pretrained_model_dir is None:
+        p_model = components["percussive"]["model_file"]
+        h_model = components["harmonic"]["model_file"]
+        v_model = components["vocal"]["model_file"]
+    else:
+        p_model = os.path.join(pretrained_model_dir, "model_percussive.h5")
+        h_model = os.path.join(pretrained_model_dir, "model_harmonic.h5")
+        v_model = os.path.join(pretrained_model_dir, "model_vocal.h5")
 
-    percussive_model = Model(
-        components["percussive"]["model_file"],
-        components["percussive"]["checkpoint_file"],
-    ).model
-
-    harmonic_model = Model(
-        components["harmonic"]["model_file"],
-        components["harmonic"]["checkpoint_file"],
-    ).model
-
-    vocal_model = Model(
-        components["vocal"]["model_file"],
-        components["vocal"]["checkpoint_file"],
-    ).model
+    print("Loading models from:\n\t{0}\n\t{1}\n\t{2}".format(h_model, p_model, v_model))
+    percussive_model = Model(p_model).model
+    harmonic_model = Model(h_model).model
+    vocal_model = Model(v_model).model
 
     n_samples = x.shape[0]
     n_chunks = int(numpy.ceil(n_samples / chunk_size))
@@ -206,25 +202,15 @@ def xtract_primal(x, instrumental=False, power=None, beta=None, single_model=Fal
             Mh = numpy.ones_like(Cmag_orig)
             Mv = numpy.ones_like(Cmag_orig)
 
-            if power:
-                tot = (
-                    numpy.power(Cmag_p, power)
-                    + numpy.power(Cmag_h, power)
-                    + numpy.power(Cmag_v, power)
-                    + K.epsilon()
-                )
-                Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
-                Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
-                Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
-            elif beta:
-                Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon()) >= beta
-                Mh = numpy.divide(Cmag_h, Cmag_p + Cmag_v + K.epsilon()) >= beta
-                Mv = numpy.divide(Cmag_v, Cmag_p + Cmag_h + K.epsilon()) >= beta
-
-                # turn into a binary mask of 1s and 0s
-                Mp = Mp.astype(numpy.int)
-                Mh = Mh.astype(numpy.int)
-                Mv = Mv.astype(numpy.int)
+            tot = (
+                numpy.power(Cmag_p, power)
+                + numpy.power(Cmag_h, power)
+                + numpy.power(Cmag_v, power)
+                + K.epsilon()
+            )
+            Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
+            Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
+            Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
 
             Cp_desired = numpy.multiply(Mp, C)
             Ch_desired = numpy.multiply(Mh, C)
