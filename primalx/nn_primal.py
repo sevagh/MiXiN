@@ -1,32 +1,17 @@
-import sys
 import os
 import numpy
-from keras.models import load_model
 import tensorflow
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import (
     Conv2D,
     MaxPooling2D,
     UpSampling2D,
-    Dense,
     Cropping2D,
     Input,
 )
-import numpy
-from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
-import scipy.io.wavfile
-import librosa
-from librosa.decompose import hpss
-from librosa.core import stft, istft
-from librosa.util import fix_length
-from scipy.signal import medfilt
-import os
+from nsgt import NSGT, BarkScale
 import matplotlib.pyplot as plt
-import tensorflow
-import keras
-from keras import layers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.models import load_model
 import keras.backend as K
 from .params import (
     chunk_size,
@@ -192,9 +177,8 @@ def xtract_primal(x, power=None, beta=None):
         # forward transform
         c = nsgt.forward(s)
         C = numpy.asarray(c)
-        Cmag = numpy.abs(C)
 
-        Cmag_orig = numpy.abs(C)  # librosa.magphase(C)
+        Cmag_orig = numpy.abs(C)
         Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
 
         # inference from model
@@ -219,9 +203,9 @@ def xtract_primal(x, power=None, beta=None):
                 + numpy.power(Cmag_v, power)
                 + K.epsilon()
             )
-            Mp = numpy.divide(numpy.power(Cmag_p, 2.0), tot)
-            Mh = numpy.divide(numpy.power(Cmag_h, 2.0), tot)
-            Mv = numpy.divide(numpy.power(Cmag_v, 2.0), tot)
+            Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
+            Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
+            Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
         elif beta:
             Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon()) >= beta
             Mh = numpy.divide(Cmag_h, Cmag_p + Cmag_v + K.epsilon()) >= beta

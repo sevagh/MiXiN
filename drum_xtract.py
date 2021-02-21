@@ -1,9 +1,8 @@
 #! /usr/bin/env python
 
 import librosa
-import numpy
 import os
-from primalx import xtract_primitive, xtract_primal
+from primalx import xtract_primal
 from primalx.params import sample_rate
 from argparse import ArgumentParser
 import scipy

@@ -6,13 +6,10 @@ import multiprocessing
 import argparse
 import os
 import numpy
-import subprocess
 import shutil
 import itertools
-from essentia.standard import MonoLoader
 import tensorflow_io as tfio
 import tensorflow as tf
-import soundfile
 from primalx import Model
 from primalx.params import (
     data_dir,

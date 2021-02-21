@@ -1,12 +1,8 @@
 import numpy
-from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
-import scipy.io.wavfile
-import librosa
+from nsgt import NSGT, BarkScale
 from librosa.decompose import hpss
 from librosa.core import stft, istft
 from librosa.util import fix_length
-from scipy.signal import medfilt
-import os
 from .params import chunk_size, sample_rate
 
 
