@@ -128,7 +128,11 @@ def train_network(args):
         data = hf["data"][:]
 
         X = numpy.copy(data[:, :1025, :])
-        Y = numpy.copy(data[:, 1025:, :])
+
+        # copy the input _and_ output to Y
+        # since the output of the NN will be a soft mask in [0, 1] applied to the input
+        # to produce the output
+        Y = numpy.copy(data[:, :, :])
         print(X.shape)
         print(Y.shape)
 

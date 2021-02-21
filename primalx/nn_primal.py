@@ -5,7 +5,7 @@ import numpy
 from keras.models import load_model
 import tensorflow
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dense, Cropping2D
+from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dense, Cropping2D, ZeroPadding2D, Input
 import numpy
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 import scipy.io.wavfile
@@ -22,6 +22,7 @@ from keras import layers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import load_model
 import keras.backend as K
+from keras.utils.generic_utils import get_custom_objects
 
 mypath = os.path.dirname(os.path.abspath(__file__))
 
@@ -41,9 +42,32 @@ with open(os.path.join(mypath, "../params.json")) as f:
     sample_rate = params["sample_rate"]
 
 
-def _create_model():
-    model = Sequential()
+def _custom_mae(y_true, y_pred):
+    # real y pred is the soft mask, computed in the first half of the output of the network
+    # multiplied by the input which is the first half of y true
+    # second half of the network is the zeropadding2d
+    y_pred_actual = y_true[:, :1025, :, :] * y_pred[:, :1025, :, :]
 
+    # the actual y_true is the second half of the input which is the desired output
+    y_true_actual = y_true[:, 1025:, :, :]
+
+    y_true_actual = K.cast(y_true_actual, y_pred_actual.dtype)
+    diff = K.abs((y_true_actual - y_pred_actual) / K.clip(K.abs(y_true_actual),
+                                                   K.epsilon(),
+                                                   None))
+    return 100. * K.mean(diff, axis=-1)
+
+
+get_custom_objects().update({"_custom_mae": _custom_mae})
+
+
+def _create_model():
+    # stft with window size 1024, nfft = 2048 (nfft/2 + 1 outputs)
+    # 87 frames of chunk_size, 44032 samples each
+    # 1 channel since an STFT is just 1 float, not 3 e.g. RGB
+    model = Sequential()
+    model.add(
+            Input(shape=(1025, 87, 1)))
     model.add(
         Conv2D(12, kernel_size=3, activation="relu", padding="same")
     )  # 13*1023*12
@@ -63,9 +87,15 @@ def _create_model():
     model.add(UpSampling2D(size=(1, 5), data_format=None, interpolation="nearest"))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
-    model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
+
+    # sigmoid activation function as a soft mask between 0 and 1
+    model.add(Conv2D(1, kernel_size=1, activation="sigmoid", padding="same"))
     model.add(Cropping2D(cropping=((0, 1), (0, 13))))
-    model.compile(loss="mae", optimizer="adam", metrics=["mae"])
+
+    # add a zeropadding2d for the dummy first half of the output
+    model.add(ZeroPadding2D(padding=((0, 1025), (0, 0))))
+
+    model.compile(loss=_custom_mae, optimizer="adam", metrics=["mae"])
 
     return model
 
@@ -135,7 +165,6 @@ class Model:
         self.model.summary()
 
     def build_and_summary(self):
-        self.model.build(input_shape=(None, 1025, 87, 1))
         self.model.summary()
 
 
@@ -204,17 +233,17 @@ def xtract_primal(x):
             hop_length=int(0.5 * nn_time_win),
         )
         Spmag = numpy.abs(Sp)
-        print(Spmag.shape)
 
         Spmag_for_nn = numpy.reshape(Spmag, (1, 1025, 87, 1))
 
         # inference from model
-        Spmag_from_nn = model.predict(Spmag_for_nn)
-        print(Spmag_from_nn.shape)
-        Spmag_nn = numpy.reshape(Spmag_from_nn, (1025, 87))
+        mask_from_nn = model.predict(Spmag_for_nn)
+        mask = numpy.reshape(mask_from_nn, (2050, 87))
 
-        Mp = numpy.divide(Spmag_nn, Spmag)
-        Sp_nn = numpy.multiply(Mp, Sp)
+        # slice off zero-padding at the end
+        mask = mask[:1025, :]
+
+        Sp_nn = numpy.multiply(mask, Sp)
 
         s_p_nn = fix_length(
             istft(Sp_nn, win_length=nn_time_win, hop_length=int(0.5 * nn_time_win)),
