@@ -2,7 +2,6 @@
 
 import h5py
 import sys
-import json
 import multiprocessing
 import argparse
 import os

@@ -1,5 +1,0 @@
-{
-  "chunk_size": 44032,
-  "stft_window_size": 1024,
-  "sample_rate": 44100
-}

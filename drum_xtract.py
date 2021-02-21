@@ -2,7 +2,6 @@
 
 import librosa
 import numpy
-import json
 import os
 from primalx import xtract_primitive, xtract_primal
 from primalx.params import sample_rate

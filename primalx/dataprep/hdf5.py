@@ -33,8 +33,8 @@ def compute_hdf5_row(tup):
     x_ref = numpy.concatenate((x_ref, numpy.zeros(n_pad)))
 
     print("Applying primitive drum extraction")
-    #x_sep = xtract_primitive(x_mix)
-    x_sep = x_mix
+    x_sep = xtract_primitive(x_mix)
+    # x_sep = x_mix
 
     scl = BarkScale(0, 22050, 96)
 
@@ -57,22 +57,12 @@ def compute_hdf5_row(tup):
 
         Cmagref = numpy.abs(Cref)
 
-        print('Csep: ')
-        print(Csep.shape)
-        print(Csep.dtype)
-        print(Cmagsep.shape)
-        print(Cmagsep.dtype)
-
-        print('Cref: ')
-        print(Cref.shape)
-        print(Cref.dtype)
-        print(Cmagref.shape)
-        print(Cmagref.dtype)
-        
         spec_in.append(Cmagsep)
         spec_out.append(Cmagref)
 
     for spec_pairs in zip(spec_in, spec_out):
-        all_ndarray_rows.append(numpy.concatenate((spec_pairs[0], spec_pairs[1]), axis=1))
+        all_ndarray_rows.append(
+            numpy.concatenate((spec_pairs[0], spec_pairs[1]), axis=1)
+        )
 
     return all_ndarray_rows
