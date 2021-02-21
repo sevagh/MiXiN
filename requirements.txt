@@ -4,6 +4,7 @@ numpy
 git+git://github.com/sevagh/nsgt#egg=nsgt
 keras
 tensorflow>=2.2
+tensorflow-io
 h5py
 matplotlib
 soundfile

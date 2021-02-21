@@ -10,6 +10,7 @@ import subprocess
 import shutil
 import itertools
 from essentia.standard import MonoLoader
+import tensorflow_io as tfio
 import soundfile
 from primalx import Model
 from primalx.params import (
@@ -21,7 +22,10 @@ from primalx.params import (
     n_frames,
 )
 from primalx.dataprep import prepare_stems, compute_hdf5_row
-from sklearn.model_selection import train_test_split
+
+TRAIN = 0.8
+VALIDATION = 0.1
+TEST = 0.1
 
 
 def parse_args():
@@ -72,6 +76,16 @@ def parse_args():
         action="store_true",
         help="don't train, only data prep",
     )
+    parser.add_argument(
+        "--no-stems",
+        action="store_true",
+        help="don't prepare stems",
+    )
+    parser.add_argument(
+        "--no-hdf5",
+        action="store_true",
+        help="don't prepare hdf5 file",
+    )
 
     return parser.parse_args()
 
@@ -86,56 +100,101 @@ def prepare_data(args):
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
 
-    prepare_stems(
-        args.stem_dirs,
-        data_dir,
-        args.track_limit,
-        args.segment_duration,
-        args.segment_limit,
-        args.segment_offset,
-    )
+    if not args.no_stems:
+        prepare_stems(
+            args.stem_dirs,
+            data_dir,
+            args.track_limit,
+            args.segment_duration,
+            args.segment_limit,
+            args.segment_offset,
+        )
 
-    pool = multiprocessing.Pool(args.n_pool)
+    if not args.no_stems:
+        pool = multiprocessing.Pool(args.n_pool)
 
-    testcases = []
+        testcases = []
 
-    for track in os.scandir(data_dir):
-        mix = None
-        ref = None
-        if os.path.isfile(track):
-            # skip the hdf5 file
-            continue
-        for fname in os.listdir(track):
-            if fname == "drum.wav":
-                ref = fname
-            elif fname == "mix.wav":
-                mix = fname
-        mix = os.path.join(data_dir, track, mix)
-        ref = os.path.join(data_dir, track, ref)
-        testcases.append((mix, ref))
+        for track in os.scandir(data_dir):
+            mix = None
+            ref = None
+            if os.path.isfile(track):
+                # skip the hdf5 file
+                continue
+            for fname in os.listdir(track):
+                if fname == "drum.wav":
+                    ref = fname
+                elif fname == "mix.wav":
+                    mix = fname
+            mix = os.path.join(data_dir, track, mix)
+            ref = os.path.join(data_dir, track, ref)
+            testcases.append((mix, ref))
 
-    with h5py.File(data_hdf5_file, "w") as hf:
-        dataset = hf.create_dataset("data", (1, n_frames, 2*stft_nfft), maxshape=(None, n_frames, 2*stft_nfft))
+        with h5py.File(data_hdf5_file, "w") as hf:
+            x_train_dataset = hf.create_dataset("data-x-train", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            y_train_dataset = hf.create_dataset("data-y-train", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
 
-        for i in range(0, len(testcases)-1, args.n_pool):
-            limited_testcases = testcases[i:i+args.n_pool]
+            x_test_dataset = hf.create_dataset("data-x-test", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            y_test_dataset = hf.create_dataset("data-y-test", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
 
-            outputs = list(
-                itertools.chain.from_iterable(
-                    pool.starmap(
-                        compute_hdf5_row,
-                        zip(
-                            limited_testcases,
-                        ),
+            x_validation_dataset = hf.create_dataset("data-x-validation", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            y_validation_dataset = hf.create_dataset("data-y-validation", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+
+            for i in range(0, len(testcases)-1, args.n_pool):
+                limited_testcases = testcases[i:i+args.n_pool]
+
+                outputs = list(
+                    itertools.chain.from_iterable(
+                        pool.starmap(
+                            compute_hdf5_row,
+                            zip(
+                                limited_testcases,
+                            ),
+                        )
                     )
                 )
-            )
-            to_add = numpy.asarray(outputs)
+                to_add = numpy.asarray(outputs)
 
-            # we have 
-            dataset.resize((dataset.shape[0] + to_add.shape[0]), axis=0)
-            dataset[-to_add.shape[0]:, :, :] = to_add
-        print('dataset final shape: {0}'.format(dataset.shape))
+                train_idx = int(TRAIN*to_add.shape[0])
+                test_idx = int(VALIDATION*to_add.shape[0])
+
+                to_add_train = to_add[:train_idx, :, :]
+                to_add_test = to_add[train_idx:train_idx+test_idx, :, :]
+                to_add_validation = to_add[train_idx+test_idx:, :, :]
+
+                to_add_x_train = to_add_train[:, :, :stft_nfft]
+                to_add_y_train = to_add_train[:, :, stft_nfft:]
+
+                to_add_x_test = to_add_test[:, :, :stft_nfft]
+                to_add_y_test = to_add_test[:, :, stft_nfft:]
+
+                to_add_x_validation = to_add_validation[:, :, :stft_nfft]
+                to_add_y_validation = to_add_validation[:, :, stft_nfft:]
+
+                print('TRAIN/TEST/VALIDATION SPLIT:\n\tall: {0}\n\ttrain: {1}\n\ttest: {2}\n\tvalidation: {3}'.format(
+                    to_add.shape,
+                    to_add_train.shape,
+                    to_add_test.shape,
+                    to_add_validation.shape
+                ))
+
+                x_train_dataset.resize((x_train_dataset.shape[0] + to_add_x_train.shape[0]), axis=0)
+                x_train_dataset[-to_add_x_train.shape[0]:, :, :] = to_add_x_train
+
+                y_train_dataset.resize((y_train_dataset.shape[0] + to_add_y_train.shape[0]), axis=0)
+                y_train_dataset[-to_add_y_train.shape[0]:, :, :] = to_add_y_train
+
+                x_test_dataset.resize((x_test_dataset.shape[0] + to_add_x_test.shape[0]), axis=0)
+                x_test_dataset[-to_add_x_test.shape[0]:, :, :] = to_add_x_test
+
+                y_test_dataset.resize((y_test_dataset.shape[0] + to_add_y_test.shape[0]), axis=0)
+                y_test_dataset[-to_add_y_test.shape[0]:, :, :] = to_add_y_test
+
+                x_validation_dataset.resize((x_validation_dataset.shape[0] + to_add_x_validation.shape[0]), axis=0)
+                x_validation_dataset[-to_add_x_validation.shape[0]:, :, :] = to_add_x_validation
+
+                y_validation_dataset.resize((y_validation_dataset.shape[0] + to_add_y_validation.shape[0]), axis=0)
+                y_validation_dataset[-to_add_y_validation.shape[0]:, :, :] = to_add_y_validation
 
 
 def train_network(args):
@@ -153,51 +212,23 @@ def train_network(args):
     model = Model()
     model.build_and_summary()
 
-    with h5py.File(data_hdf5_file, "r") as hf:
-        data = hf["data"][:]
-        print(data.shape)
+    # input spectrogram
+    X_train = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-x-train")
+    Y_train = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-y-train")
 
-        # input spectrogram
-        X = numpy.copy(data[:, :, :stft_nfft])
+    X_test = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-x-test")
+    Y_test = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-y-test")
 
-        print(X.shape)
+    X_validation = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-x-validation")
+    Y_validation = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-y-validation")
 
-        # output spectrogram
-        Y = numpy.copy(data[:, :, stft_nfft:])
+    model.train(X_train, Y_train, X_validation, Y_validation, plot=args.plot_training)
+    model.evaluate_scores(X_train, Y_train, "train")
+    model.evaluate_scores(X_val, Y_val, "validation")
+    model.evaluate_scores(X_test, Y_test, "test")
 
-        print(Y.shape)
-
-        # split into 90/10. then pass validation_split to keras fit
-        X_train, X_test, Y_train, Y_test = train_test_split(
-            X, Y, train_size=0.9, test_size=0.1, random_state=42
-        )
-
-        X_train = numpy.reshape(
-            X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2], 1)
-        )
-        Y_train = numpy.reshape(
-            Y_train, (Y_train.shape[0], Y_train.shape[1], Y_train.shape[2], 1)
-        )
-
-        X_test = numpy.reshape(
-            X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2], 1)
-        )
-        Y_test = numpy.reshape(
-            Y_test, (Y_test.shape[0], Y_test.shape[1], Y_test.shape[2], 1)
-        )
-
-        print(X_train.shape)
-        print(Y_train.shape)
-
-        print(X_test.shape)
-        print(Y_test.shape)
-
-        model.train(X_train, Y_train, plot=args.plot_training)
-        model.evaluate_scores(X_train, Y_train, "train")
-        model.evaluate_scores(X_test, Y_test, "test")
-
-        print("saving model")
-        model.save()
+    print("saving model")
+    model.save()
 
 
 if __name__ == "__main__":

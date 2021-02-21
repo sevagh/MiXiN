@@ -108,14 +108,14 @@ class Model:
             mode="auto",
         )
 
-    def train(self, X, Y, batch_size=64, epochs=100, validation_split=0.1, plot=False):
+    def train(self, X_train, Y_train, X_val, Y_val, batch_size=64, epochs=100, validation_split=0.1, plot=False):
         history = self.model.fit(
-            X,
-            Y,
+            X_train,
+            Y_train,
             batch_size=batch_size,
             epochs=epochs,
             callbacks=[self.monitor, self.checkpoint],
-            validation_split=validation_split,
+            validation_data=(X_val, Y_val),
             verbose=1,
         )
         if plot:
