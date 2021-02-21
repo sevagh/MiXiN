@@ -32,8 +32,8 @@ def compute_hdf5_row(tup):
     x_mix = numpy.concatenate((x_mix, numpy.zeros(n_pad)))
     x_ref = numpy.concatenate((x_ref, numpy.zeros(n_pad)))
 
-    #print("Applying primitive drum extraction")
-    #x_sep = xtract_primitive(x_mix)
+    # print("Applying primitive drum extraction")
+    # x_sep = xtract_primitive(x_mix)
     x_sep = x_mix
 
     scl = BarkScale(0, 22050, 96)

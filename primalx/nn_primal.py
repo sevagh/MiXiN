@@ -148,7 +148,12 @@ class Model:
         self.model.summary()
 
 
-def xtract_primal(x):
+def xtract_primal(x, power=None, beta=None):
+    if (power is None) == (beta is None):
+        raise ValueError(
+            "supply one of power (2.0 = default, soft masking/wiener filter) or beta (2.0 default, separation factor for hard masking)"
+        )
+
     percussive_model = Model(
         components["percussive"]["model_file"],
         components["percussive"]["checkpoint_file"],
@@ -169,7 +174,9 @@ def xtract_primal(x):
     n_pad = n_chunks * chunk_size - x.shape[0]
 
     x = numpy.concatenate((x, numpy.zeros(n_pad)))
-    x_out = numpy.zeros_like(x)
+    x_out_h = numpy.zeros_like(x)
+    x_out_p = numpy.zeros_like(x)
+    x_out_v = numpy.zeros_like(x)
 
     # 96 bins per octave on the bark scale
     # bark chosen as it might better represent low-frequency sounds (drums)
@@ -187,12 +194,7 @@ def xtract_primal(x):
         C = numpy.asarray(c)
         Cmag = numpy.abs(C)
 
-
-        '''
-        remove primitive!
-        '''
-
-        Cmag_orig = numpy.abs(C) #librosa.magphase(C)
+        Cmag_orig = numpy.abs(C)  # librosa.magphase(C)
         Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
 
         # inference from model
@@ -205,71 +207,48 @@ def xtract_primal(x):
         Cmag_v = vocal_model.predict(Cmag_for_nn)
         Cmag_v = numpy.reshape(Cmag_v, (n_frames, stft_nfft))
 
-        #Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon())
-
         # soft mask first
-        Mp = numpy.divide(numpy.power(Cmag_p, 2.0), numpy.power(Cmag_p, 2.0) + numpy.power(Cmag_h, 2.0) + numpy.power(Cmag_v, 2.0) + K.epsilon())
+        Mp = numpy.ones_like(Cmag_orig)
+        Mh = numpy.ones_like(Cmag_orig)
+        Mv = numpy.ones_like(Cmag_orig)
 
-        # use inference magnitude + original phase as specified in the paper
-        #C_desired = _pol2cart(Cmag_from_nn, Cphase_orig)
+        if power:
+            tot = (
+                numpy.power(Cmag_p, power)
+                + numpy.power(Cmag_h, power)
+                + numpy.power(Cmag_v, power)
+                + K.epsilon()
+            )
+            Mp = numpy.divide(numpy.power(Cmag_p, 2.0), tot)
+            Mh = numpy.divide(numpy.power(Cmag_h, 2.0), tot)
+            Mv = numpy.divide(numpy.power(Cmag_v, 2.0), tot)
+        elif beta:
+            Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon()) >= beta
+            Mh = numpy.divide(Cmag_h, Cmag_p + Cmag_v + K.epsilon()) >= beta
+            Mv = numpy.divide(Cmag_v, Cmag_p + Cmag_h + K.epsilon()) >= beta
 
-        C_desired = numpy.multiply(Mp, C)
+            # turn into a binary mask of 1s and 0s
+            Mp = Mp.astype(numpy.int)
+            Mh = Mh.astype(numpy.int)
+            Mv = Mv.astype(numpy.int)
+
+        Cp_desired = numpy.multiply(Mp, C)
+        Ch_desired = numpy.multiply(Mh, C)
+        Cv_desired = numpy.multiply(Mv, C)
 
         # inverse transform
-        s_p = nsgt.backward(C_desired)
-        x_out[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p
-        '''
-        primitive removed!
-        '''
+        s_p = nsgt.backward(Cp_desired)
+        s_h = nsgt.backward(Ch_desired)
+        s_v = nsgt.backward(Cv_desired)
 
-        # two iterations of CQT median filtering
-        #for i in range(2):
-        #    _, Mp = hpss(Cmag, power=2.0, margin=1.0, kernel_size=(17, 7), mask=True)
-        #    Cp = numpy.multiply(Mp, C)
-        #    Cmag = Cp
-
-        #s_p = nsgt.backward(Cp)
-
-        #perc_time_win = 2048
-
-        #S = stft(
-        #    s_p,
-        #    n_fft=2 * perc_time_win,
-        #    win_length=perc_time_win,
-        #    hop_length=int(0.5 * perc_time_win),
-        #)
-        #Smag = numpy.abs(S)
-
-        ## two iterations of STFT median filtering
-        #for i in range(2):
-        #    _, Mp = hpss(Smag, power=2.0, margin=1.0, kernel_size=(17, 17), mask=True)
-        #    Sp = numpy.multiply(Mp, S)
-        #    Smag = Sp
-
-        #s_p = fix_length(
-        #    istft(Sp, win_length=perc_time_win, hop_length=int(0.5 * perc_time_win)),
-        #    len(s_p),
-        #)
-
-        ## last step, apply learned network
-        #cp = nsgt.forward(s_p)
-        #Cp = numpy.asarray(cp)
-
-        #Cpmag_orig, Cphase_orig = librosa.magphase(Cp)
-        #Cpmag_for_nn = numpy.reshape(Cpmag_orig, (1, n_frames, stft_nfft, 1))
-
-        ## inference from model
-        #Cpmag_from_nn = model.predict(Cpmag_for_nn)
-        #Cpmag_from_nn = numpy.reshape(Cpmag_from_nn, (n_frames, stft_nfft))
-
-        ### use inference magnitude + original phase as specified in the paper
-        #Cp_desired = _pol2cart(Cpmag_from_nn, Cphase_orig)
-
-        ## inverse transform
-        #s_p_nn = nsgt.backward(Cp_desired)
-        #x_out[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p_nn
+        x_out_p[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p
+        x_out_v[chunk * chunk_size : (chunk + 1) * chunk_size] = s_v
+        x_out_h[chunk * chunk_size : (chunk + 1) * chunk_size] = s_h
 
     # strip off padding
     if n_pad > 0:
-        x_out = x_out[:-n_pad]
-    return x_out
+        x_out_p = x_out_p[:-n_pad]
+        x_out_h = x_out_h[:-n_pad]
+        x_out_v = x_out_v[:-n_pad]
+
+    return x_out_h, x_out_p, x_out_v

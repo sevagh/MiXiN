@@ -13,12 +13,15 @@ if __name__ == "__main__":
     parser = ArgumentParser()
 
     parser.add_argument(
-        "--use-nn",
-        action="store_true",
-        help="use trained neural network vs plain DSP separation",
+        "--beta",
+        default=None,
+        type=float,
+        help="hard mask separation factor, default %(default)s",
+    )
+    parser.add_argument(
+        "--power", default=None, type=float, help="soft mask power, default %(default)s"
     )
     parser.add_argument("input", type=str, help="input audio file")
-    parser.add_argument("output", type=str, help="output audio file")
 
     args = parser.parse_args()
     if not os.path.exists(args.input):
@@ -27,12 +30,10 @@ if __name__ == "__main__":
     # Read audio data
     x, _ = librosa.load(args.input, sr=sample_rate, mono=True)
 
-    x_out = numpy.zeros_like(x)
-    if args.use_nn:
-        x_out = xtract_primal(x)
-    else:
-        x_out = xtract_primitive(x)
+    x_h_out, x_p_out, x_v_out = xtract_primal(x, power=args.power, beta=args.beta)
 
-    print("Writing audio file '%s'" % args.output)
-    scipy.io.wavfile.write(args.output, sample_rate, x_out)
+    print("Writing harmonic, percussive, vocal audio files")
+    scipy.io.wavfile.write("harmonic.wav", sample_rate, x_h_out)
+    scipy.io.wavfile.write("percussive.wav", sample_rate, x_p_out)
+    scipy.io.wavfile.write("vocal.wav", sample_rate, x_v_out)
     print("Done")

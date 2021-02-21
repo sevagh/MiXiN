@@ -21,7 +21,7 @@ from primalx.params import (
     stft_nfft,
     n_frames,
     batch_size,
-    components
+    components,
 )
 from primalx.dataprep import prepare_stems, compute_hdf5_row
 
@@ -115,7 +115,7 @@ def prepare_data(args):
     if not args.no_hdf5:
         pool = multiprocessing.Pool(args.n_pool)
 
-        testcases = {'harmonic': [], 'percussive': [], 'vocal': []}
+        testcases = {"harmonic": [], "percussive": [], "vocal": []}
 
         for track in os.scandir(data_dir):
             mix = None
@@ -141,12 +141,12 @@ def prepare_data(args):
             ref_percussive = os.path.join(data_dir, track, ref_percussive)
             ref_harmonic = os.path.join(data_dir, track, ref_harmonic)
 
-            testcases['percussive'].append((mix, ref_percussive))
-            testcases['harmonic'].append((mix, ref_harmonic))
+            testcases["percussive"].append((mix, ref_percussive))
+            testcases["harmonic"].append((mix, ref_harmonic))
 
             if ref_vocal:
                 ref_vocal = os.path.join(data_dir, track, ref_vocal)
-                testcases['vocal'].append((mix, ref_vocal))
+                testcases["vocal"].append((mix, ref_vocal))
 
         for component, component_files in components.items():
             with h5py.File(component_files["data_hdf5_file"], "w") as hf:
@@ -215,8 +215,9 @@ def prepare_data(args):
                     to_add_y_validation = to_add_validation[:, :, stft_nfft:]
 
                     print(
-                        "{0} TRAIN/TEST/VALIDATION SPLIT:\n\tall: {0}\n\ttrain: {1}\n\ttest: {2}\n\tvalidation: {3}".format(
+                        "{0} chunk {1} TRAIN/TEST/VALIDATION SPLIT:\n\tall data: {2}\n\ttrain: {3}\n\ttest: {4}\n\tvalidation: {5}".format(
                             component,
+                            i,
                             to_add.shape,
                             to_add_train.shape,
                             to_add_test.shape,
@@ -251,7 +252,9 @@ def prepare_data(args):
                     x_test_dataset.resize(
                         (x_test_dataset.shape[0] + to_add_x_test.shape[0]), axis=0
                     )
-                    x_test_dataset[-to_add_x_test.shape[0] :, :, :] = to_add_x_test.reshape(
+                    x_test_dataset[
+                        -to_add_x_test.shape[0] :, :, :
+                    ] = to_add_x_test.reshape(
                         to_add_x_test.shape[0],
                         to_add_x_test.shape[1],
                         to_add_x_test.shape[2],
@@ -261,7 +264,9 @@ def prepare_data(args):
                     y_test_dataset.resize(
                         (y_test_dataset.shape[0] + to_add_y_test.shape[0]), axis=0
                     )
-                    y_test_dataset[-to_add_y_test.shape[0] :, :, :] = to_add_y_test.reshape(
+                    y_test_dataset[
+                        -to_add_y_test.shape[0] :, :, :
+                    ] = to_add_y_test.reshape(
                         to_add_y_test.shape[0],
                         to_add_y_test.shape[1],
                         to_add_y_test.shape[2],
@@ -308,28 +313,38 @@ def train_network(args):
             pass
 
     for component, component_files in components.items():
-        print('Training model for {0}'.format(component))
-        model = Model(component_files['model_file'], component_files['checkpoint_file'])
+        print("Training model for {0}".format(component))
+        model = Model(component_files["model_file"], component_files["checkpoint_file"])
         model.build_and_summary()
 
         # input spectrogram
-        X_train = tfio.IODataset.from_hdf5(component_files['data_hdf5_file'], dataset="/data-x-train")
-        Y_train = tfio.IODataset.from_hdf5(component_files['data_hdf5_file'], dataset="/data-y-train")
+        X_train = tfio.IODataset.from_hdf5(
+            component_files["data_hdf5_file"], dataset="/data-x-train"
+        )
+        Y_train = tfio.IODataset.from_hdf5(
+            component_files["data_hdf5_file"], dataset="/data-y-train"
+        )
 
-        X_test = tfio.IODataset.from_hdf5(component_files['data_hdf5_file'], dataset="/data-x-test")
-        Y_test = tfio.IODataset.from_hdf5(component_files['data_hdf5_file'], dataset="/data-y-test")
+        X_test = tfio.IODataset.from_hdf5(
+            component_files["data_hdf5_file"], dataset="/data-x-test"
+        )
+        Y_test = tfio.IODataset.from_hdf5(
+            component_files["data_hdf5_file"], dataset="/data-y-test"
+        )
 
         X_validation = tfio.IODataset.from_hdf5(
-            component_files['data_hdf5_file'], dataset="/data-x-validation"
+            component_files["data_hdf5_file"], dataset="/data-x-validation"
         )
         Y_validation = tfio.IODataset.from_hdf5(
-            component_files['data_hdf5_file'], dataset="/data-y-validation"
+            component_files["data_hdf5_file"], dataset="/data-y-validation"
         )
 
         train_data_set = tf.data.Dataset.zip(
             (X_train.batch(batch_size), Y_train.batch(batch_size))
         )
-        test_data_set = tf.data.Dataset.zip((X_test.batch(batch_size), Y_test.batch(batch_size)))
+        test_data_set = tf.data.Dataset.zip(
+            (X_test.batch(batch_size), Y_test.batch(batch_size))
+        )
         validation_data_set = tf.data.Dataset.zip(
             (X_validation.batch(batch_size), Y_validation.batch(batch_size))
         )

@@ -59,12 +59,14 @@ def prepare_stems(
                             not in [
                                 percussive_track_index,
                                 vocal_track_index,
-                                mix_track_index, # skip auto-mix, make our own
+                                mix_track_index,  # skip auto-mix, make our own
                             ]
                         ]
                     )
                     full_mix_vocal = (
-                        harmonic_mix + loaded_wavs[vocal_track_index] + loaded_wavs[percussive_track_index]
+                        harmonic_mix
+                        + loaded_wavs[vocal_track_index]
+                        + loaded_wavs[percussive_track_index]
                     )
 
                     full_mix_novocal = (
@@ -123,7 +125,9 @@ def prepare_stems(
                             mix_path_v, full_mix_vocal[left:right], sample_rate
                         )
                         soundfile.write(
-                            vocal_path_v, loaded_wavs[vocal_track_index][left:right], sample_rate
+                            vocal_path_v,
+                            loaded_wavs[vocal_track_index][left:right],
+                            sample_rate,
                         )
 
                         # write the percussive track
