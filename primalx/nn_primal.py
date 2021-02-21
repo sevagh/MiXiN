@@ -42,23 +42,23 @@ with open(os.path.join(mypath, "../params.json")) as f:
     sample_rate = params["sample_rate"]
 
 
-def _custom_mae(y_true, y_pred):
-    # real y pred is the soft mask, computed in the first half of the output of the network
-    # multiplied by the input which is the first half of y true
-    # second half of the network is the zeropadding2d
-    y_pred_actual = y_true[:, :1025, :, :] * y_pred[:, :1025, :, :]
-
-    # the actual y_true is the second half of the input which is the desired output
-    y_true_actual = y_true[:, 1025:, :, :]
-
-    y_true_actual = K.cast(y_true_actual, y_pred_actual.dtype)
-    diff = K.abs((y_true_actual - y_pred_actual) / K.clip(K.abs(y_true_actual),
-                                                   K.epsilon(),
-                                                   None))
-    return 100. * K.mean(diff, axis=-1)
-
-
-get_custom_objects().update({"_custom_mae": _custom_mae})
+#def _custom_mae(y_true, y_pred):
+#    # real y pred is the soft mask, computed in the first half of the output of the network
+#    # multiplied by the input which is the first half of y true
+#    # second half of the network is the zeropadding2d
+#    y_pred_actual = y_true[:, :1025, :, :] * y_pred[:, :1025, :, :]
+#
+#    # the actual y_true is the second half of the input which is the desired output
+#    y_true_actual = y_true[:, 1025:, :, :]
+#
+#    y_true_actual = K.cast(y_true_actual, y_pred_actual.dtype)
+#    diff = K.abs((y_true_actual - y_pred_actual) / K.clip(K.abs(y_true_actual),
+#                                                   K.epsilon(),
+#                                                   None))
+#    return 100. * K.mean(diff, axis=-1)
+#
+#
+#get_custom_objects().update({"_custom_mae": _custom_mae})
 
 
 def _create_model():
@@ -88,14 +88,14 @@ def _create_model():
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
 
-    # sigmoid activation function as a soft mask between 0 and 1
-    model.add(Conv2D(1, kernel_size=1, activation="sigmoid", padding="same"))
+    model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
     model.add(Cropping2D(cropping=((0, 1), (0, 13))))
 
     # add a zeropadding2d for the dummy first half of the output
-    model.add(ZeroPadding2D(padding=((0, 1025), (0, 0))))
+    #model.add(ZeroPadding2D(padding=((0, 1025), (0, 0))))
 
-    model.compile(loss=_custom_mae, optimizer="adam", metrics=["mae"])
+    #model.compile(loss=_custom_mae, optimizer="adam", metrics=["_custom_mae"])
+    model.compile(loss='mae', optimizer="adam", metrics=["mae"])
 
     return model
 
@@ -114,7 +114,7 @@ class Model:
                     os.mkdir(d)
             self.model = _create_model()
 
-        self.monitor = EarlyStopping(monitor="loss", patience=5)
+        self.monitor = EarlyStopping(monitor="val_loss", patience=2, min_delta=0, mode='auto', verbose=1)
 
         self.checkpoint = ModelCheckpoint(
             checkpoint_file,
@@ -125,7 +125,7 @@ class Model:
             mode="auto",
         )
 
-    def train(self, X, Y, batch_size=10, epochs=100, validation_split=0.1, plot=False):
+    def train(self, X, Y, batch_size=64, epochs=100, validation_split=0.1, plot=False):
         history = self.model.fit(
             X,
             Y,
@@ -136,7 +136,6 @@ class Model:
             verbose=1,
         )
         if plot:
-            #  "Accuracy"
             plt.plot(history.history["mae"])
             plt.plot(history.history["val_mae"])
             plt.title("model mae")
@@ -144,7 +143,7 @@ class Model:
             plt.xlabel("epoch")
             plt.legend(["train", "validation"], loc="upper left")
             plt.show()
-            # "Loss"
+
             plt.plot(history.history["loss"])
             plt.plot(history.history["val_loss"])
             plt.title("model loss")
@@ -237,11 +236,10 @@ def xtract_primal(x):
         Spmag_for_nn = numpy.reshape(Spmag, (1, 1025, 87, 1))
 
         # inference from model
-        mask_from_nn = model.predict(Spmag_for_nn)
-        mask = numpy.reshape(mask_from_nn, (2050, 87))
+        Spmag_desired_from_nn = model.predict(Spmag_for_nn)
+        Spmag_desired = numpy.reshape(Spmag_desired_from_nn, (1025, 87))
 
-        # slice off zero-padding at the end
-        mask = mask[:1025, :]
+        mask = numpy.divide(Spmag_desired, Spmag)
 
         Sp_nn = numpy.multiply(mask, Sp)
 

@@ -64,9 +64,7 @@ def compute_hdf5_row(tup):
         Xrefmag = numpy.abs(Xref)
 
         spec_in.append(Xsepmag)
-        print(Xsepmag.shape)
         spec_out.append(Xrefmag)
-        print(Xrefmag.shape)
 
     for spec_pairs in zip(spec_in, spec_out):
         all_ndarray_rows.append(numpy.concatenate((spec_pairs[0], spec_pairs[1])))
