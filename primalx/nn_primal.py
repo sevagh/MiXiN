@@ -108,10 +108,10 @@ class Model:
             mode="auto",
         )
 
-    def train(self, XY_train, XY_val, epochs=100, plot=False):
+    def train(self, XY_train, XY_val, steps_per_epoch=100, epochs=100, plot=False):
         history = self.model.fit(
             XY_train,
-            steps_per_epoch=1,
+            steps_per_epoch=steps_per_epoch,
             epochs=epochs,
             callbacks=[self.monitor, self.checkpoint],
             validation_data=XY_val,

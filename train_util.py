@@ -305,14 +305,18 @@ def train_network(args):
         data_hdf5_file, dataset="/data-y-validation"
     )
 
-    train_data_set = tf.data.Dataset.zip((X_train.batch(64), Y_train.batch(64)))
-    test_data_set = tf.data.Dataset.zip((X_test.batch(64), Y_test.batch(64)))
+    train_data_set = tf.data.Dataset.zip(
+        (X_train.repeat().batch(64), Y_train.repeat().batch(64))
+    )
+    test_data_set = tf.data.Dataset.zip(
+        (X_test.batch(64), Y_test.batch(64))
+    )
     validation_data_set = tf.data.Dataset.zip(
         (X_validation.batch(64), Y_validation.batch(64))
     )
 
-    model.train(train_data_set, validation_data_set, plot=args.plot_training)
-    model.evaluate_scores(train_data_set, "train")
+    model.train(train_data_set, validation_data_set, plot=args.plot_training, steps_per_epoch=1, epochs=1)
+    #model.evaluate_scores(train_data_set, "train")
     model.evaluate_scores(validation_data_set, "validation")
     model.evaluate_scores(test_data_set, "test")
 
