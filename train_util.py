@@ -21,6 +21,7 @@ from primalx.params import (
     data_hdf5_file,
     stft_nfft,
     n_frames,
+    batch_size,
 )
 from primalx.dataprep import prepare_stems, compute_hdf5_row
 
@@ -205,6 +206,21 @@ def prepare_data(args):
                     )
                 )
 
+                print(
+                    "x TRAIN/TEST/VALIDATION SPLIT:\n\ttrain: {0}\n\ttest: {1}\n\tvalidation: {2}".format(
+                        to_add_x_train.shape,
+                        to_add_x_test.shape,
+                        to_add_x_validation.shape,
+                    )
+                )
+                print(
+                    "y TRAIN/TEST/VALIDATION SPLIT:\n\ttrain: {0}\n\ttest: {1}\n\tvalidation: {2}".format(
+                        to_add_y_train.shape,
+                        to_add_y_test.shape,
+                        to_add_y_validation.shape,
+                    )
+                )
+
                 x_train_dataset.resize(
                     (x_train_dataset.shape[0] + to_add_x_train.shape[0]), axis=0
                 )
@@ -306,11 +322,11 @@ def train_network(args):
     )
 
     train_data_set = tf.data.Dataset.zip(
-        (X_train.repeat().batch(64), Y_train.repeat().batch(64))
+        (X_train.batch(batch_size), Y_train.batch(batch_size))
     )
-    test_data_set = tf.data.Dataset.zip((X_test.batch(64), Y_test.batch(64)))
+    test_data_set = tf.data.Dataset.zip((X_test.batch(batch_size), Y_test.batch(batch_size)))
     validation_data_set = tf.data.Dataset.zip(
-        (X_validation.batch(64), Y_validation.batch(64))
+        (X_validation.batch(batch_size), Y_validation.batch(batch_size))
     )
 
     model.train(train_data_set, validation_data_set, plot=args.plot_training)

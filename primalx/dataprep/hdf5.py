@@ -9,7 +9,7 @@ import librosa
 from librosa.core import stft
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 from .. import xtract_primitive
-from ..params import chunk_size, nn_time_win, sample_rate
+from ..params import chunk_size, sample_rate
 
 
 def compute_hdf5_row(tup):
@@ -32,9 +32,9 @@ def compute_hdf5_row(tup):
     x_mix = numpy.concatenate((x_mix, numpy.zeros(n_pad)))
     x_ref = numpy.concatenate((x_ref, numpy.zeros(n_pad)))
 
-    print("Applying primitive drum extraction")
-    x_sep = xtract_primitive(x_mix)
-    # x_sep = x_mix
+    #print("Applying primitive drum extraction")
+    #x_sep = xtract_primitive(x_mix)
+    x_sep = x_mix
 
     scl = BarkScale(0, 22050, 96)
 
