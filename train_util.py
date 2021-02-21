@@ -2,6 +2,7 @@
 
 import h5py
 import sys
+import json
 import multiprocessing
 import argparse
 import os
@@ -12,14 +13,15 @@ import itertools
 from essentia.standard import MonoLoader
 import soundfile
 from primalx import Model
+from primalx.params import (
+    data_dir,
+    model_dir,
+    checkpoint_dir,
+    data_hdf5_file,
+    stft_nfft,
+)
 from primalx.dataprep import prepare_stems, compute_hdf5_row
 from sklearn.model_selection import train_test_split
-
-mypath = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.join(mypath, "data")
-model_dir = os.path.join(mypath, "model")
-checkpoint_dir = os.path.join(mypath, "logdir")
-data_hdf5_file = os.path.join(data_dir, "data.hdf5")
 
 
 def parse_args():
@@ -65,13 +67,21 @@ def parse_args():
         action="store_true",
         help="delete model and checkpoints before re-prepping",
     )
+    parser.add_argument(
+        "--no-train",
+        action="store_true",
+        help="don't train, only data prep",
+    )
 
     return parser.parse_args()
 
 
 def prepare_data(args):
     if args.data_clean:
-        shutil.rmtree(data_dir)
+        try:
+            shutil.rmtree(data_dir)
+        except FileNotFoundError:
+            pass
 
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
@@ -92,6 +102,9 @@ def prepare_data(args):
     for track in os.scandir(data_dir):
         mix = None
         ref = None
+        if os.path.isfile(track):
+            # skip the hdf5 file
+            continue
         for fname in os.listdir(track):
             if fname == "drum.wav":
                 ref = fname
@@ -118,8 +131,15 @@ def prepare_data(args):
 
 def train_network(args):
     if args.train_clean:
-        shutil.rmtree(model_dir)
-        shutil.rmtree(checkpoint_dir)
+        try:
+            shutil.rmtree(model_dir)
+        except FileNotFoundError:
+            pass
+
+        try:
+            shutil.rmtree(checkpoint_dir)
+        except FileNotFoundError:
+            pass
 
     model = Model()
     model.build_and_summary()
@@ -128,10 +148,10 @@ def train_network(args):
         data = hf["data"][:]
 
         # input spectrogram
-        X = numpy.copy(data[:, :1025, :])
+        X = numpy.copy(data[:, :stft_nfft, :])
 
         # output spectrogram
-        Y = numpy.copy(data[:, 1025:, :])
+        Y = numpy.copy(data[:, stft_nfft:, :])
 
         # split into 90/10. then pass validation_split to keras fit
         X_train, X_test, Y_train, Y_test = train_test_split(
@@ -166,7 +186,8 @@ if __name__ == "__main__":
 
     if args.stem_dirs is not None:
         prepare_data(args)
-    else:
+
+    if not args.no_train:
         train_network(args)
 
     sys.exit(0)

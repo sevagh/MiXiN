@@ -5,13 +5,9 @@ import numpy
 import json
 import os
 from primalx import xtract_primitive, xtract_primal
+from primalx.params import sample_rate
 from argparse import ArgumentParser
 import scipy
-
-mypath = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(mypath, "./params.json")) as f:
-    params = json.load(f)
-    sample_rate = params["sample_rate"]
 
 
 if __name__ == "__main__":
@@ -20,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--use-nn",
         action="store_true",
-        help="use trained neural network vs plain/primitive separation",
+        help="use trained neural network vs plain DSP separation",
     )
     parser.add_argument("input", type=str, help="input audio file")
     parser.add_argument("output", type=str, help="output audio file")

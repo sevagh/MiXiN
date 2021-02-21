@@ -1,13 +1,8 @@
 import os
 import numpy
-import json
 from essentia.standard import MonoLoader
 import soundfile
-
-mypath = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(mypath, "../../params.json")) as f:
-    params = json.load(f)
-sample_rate = params["sample_rate"]
+from ..params import sample_rate
 
 
 """
@@ -90,7 +85,7 @@ def prepare_stems(
                         seqdirv = os.path.join(data_dir, "{0}v".format(seqstr))
                         seqdirnov = os.path.join(data_dir, "{0}nov".format(seqstr))
 
-                        #if not os.path.isdir(seqdirv):
+                        # if not os.path.isdir(seqdirv):
                         #    os.mkdir(seqdirv)
 
                         if not os.path.isdir(seqdirnov):
@@ -117,23 +112,23 @@ def prepare_stems(
                             sample_rate,
                         )
 
-                        #harm_path_v = os.path.join(seqdirv, "interf.wav")
-                        #mix_path_v = os.path.join(seqdirv, "mix.wav")
-                        #perc_path_v = os.path.join(seqdirv, "drum.wav")
+                        # harm_path_v = os.path.join(seqdirv, "interf.wav")
+                        # mix_path_v = os.path.join(seqdirv, "mix.wav")
+                        # perc_path_v = os.path.join(seqdirv, "drum.wav")
 
-                        #soundfile.write(
+                        # soundfile.write(
                         #    harm_path_v, interf_mix_vocal[left:right], sample_rate
-                        #)
-                        #soundfile.write(
+                        # )
+                        # soundfile.write(
                         #    mix_path_v, full_mix_vocal[left:right], sample_rate
-                        #)
+                        # )
 
                         ## write the drum track
-                        #soundfile.write(
+                        # soundfile.write(
                         #    perc_path_v,
                         #    loaded_wavs[drum_track_index][left:right],
                         #    sample_rate,
-                        #)
+                        # )
 
                     seq += 1
                     print("wrote seq {0}".format(seq))

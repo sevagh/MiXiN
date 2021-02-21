@@ -7,11 +7,6 @@ import numpy
 from collections import defaultdict
 from essentia.standard import MonoLoader
 
-mypath = os.path.dirname(os.path.abspath(__file__))
-
-separation_dir = os.path.join(mypath, "extracted/")
-data_dir = os.path.join(mypath, "./data/")
-
 bss_metric_names = ["SDR", "ISR", "SIR", "SAR"]
 
 

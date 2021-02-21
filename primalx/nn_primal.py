@@ -1,11 +1,18 @@
 import sys
 import os
-import json
 import numpy
 from keras.models import load_model
 import tensorflow
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dense, Cropping2D, ZeroPadding2D, Input
+from keras.layers import (
+    Conv2D,
+    MaxPooling2D,
+    UpSampling2D,
+    Dense,
+    Cropping2D,
+    ZeroPadding2D,
+    Input,
+)
 import numpy
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 import scipy.io.wavfile
@@ -22,80 +29,53 @@ from keras import layers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.models import load_model
 import keras.backend as K
-from keras.utils.generic_utils import get_custom_objects
-
-mypath = os.path.dirname(os.path.abspath(__file__))
-
-model_dir = os.path.join(mypath, "../model")
-checkpoint_dir = os.path.join(mypath, "../logdir")
+from .params import (
+    nn_time_win,
+    chunk_size,
+    sample_rate,
+    stft_nfft,
+    n_frames,
+    model_file,
+    model_dir,
+    checkpoint_dir,
+    checkpoint_file,
+)
 
 physical_devices = tensorflow.config.list_physical_devices("GPU")
 tensorflow.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
-model_file = os.path.join(model_dir, "model.h5")
-checkpoint_file = os.path.join(checkpoint_dir, "model.ckpt")
 
-with open(os.path.join(mypath, "../params.json")) as f:
-    params = json.load(f)
-    nn_time_win = params["stft_window_size"]
-    chunk_size = params["chunk_size"]
-    sample_rate = params["sample_rate"]
-
-
-#def _custom_mae(y_true, y_pred):
-#    # real y pred is the soft mask, computed in the first half of the output of the network
-#    # multiplied by the input which is the first half of y true
-#    # second half of the network is the zeropadding2d
-#    y_pred_actual = y_true[:, :1025, :, :] * y_pred[:, :1025, :, :]
-#
-#    # the actual y_true is the second half of the input which is the desired output
-#    y_true_actual = y_true[:, 1025:, :, :]
-#
-#    y_true_actual = K.cast(y_true_actual, y_pred_actual.dtype)
-#    diff = K.abs((y_true_actual - y_pred_actual) / K.clip(K.abs(y_true_actual),
-#                                                   K.epsilon(),
-#                                                   None))
-#    return 100. * K.mean(diff, axis=-1)
-#
-#
-#get_custom_objects().update({"_custom_mae": _custom_mae})
+def _pol2cart(rho, phi):
+    real = rho * numpy.cos(phi)
+    imag = rho * numpy.sin(phi)
+    return real + 1j * imag
 
 
 def _create_model():
     # stft with window size 1024, nfft = 2048 (nfft/2 + 1 outputs)
     # 87 frames of chunk_size, 44032 samples each
-    # 1 channel since an STFT is just 1 float, not 3 e.g. RGB
+    # 2 channel for complex STFT (real and imaginary stored separately)
     model = Sequential()
-    model.add(
-            Input(shape=(1025, 87, 1)))
-    model.add(
-        Conv2D(12, kernel_size=3, activation="relu", padding="same")
-    )  # 13*1023*12
+    model.add(Input(shape=(stft_nfft, n_frames, 1)))
+    model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(
         MaxPooling2D(pool_size=(3, 5), strides=None, padding="same", data_format=None)
-    )  # 4*204*12
+    )
     model.add(Conv2D(20, kernel_size=3, activation="relu", padding="same"))  # 2*202*20
     model.add(
         MaxPooling2D(pool_size=(1, 5), strides=None, padding="same", data_format=None)
-    )  # 2*40*20
-    model.add(
-        Conv2D(30, kernel_size=3, activation="relu", padding="same")
-    )  # 2*40*20 --------------------------
+    )
+    model.add(Conv2D(30, kernel_size=3, activation="relu", padding="same"))
     model.add(Conv2D(40, kernel_size=3, activation="relu", padding="same"))
     model.add(Conv2D(30, kernel_size=3, activation="relu", padding="same"))
     model.add(Conv2D(20, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(1, 5), data_format=None, interpolation="nearest"))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
-
     model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
     model.add(Cropping2D(cropping=((0, 1), (0, 13))))
 
-    # add a zeropadding2d for the dummy first half of the output
-    #model.add(ZeroPadding2D(padding=((0, 1025), (0, 0))))
-
-    #model.compile(loss=_custom_mae, optimizer="adam", metrics=["_custom_mae"])
-    model.compile(loss='mae', optimizer="adam", metrics=["mae"])
+    model.compile(loss="mae", optimizer="adam", metrics=["mae"])
 
     return model
 
@@ -114,7 +94,9 @@ class Model:
                     os.mkdir(d)
             self.model = _create_model()
 
-        self.monitor = EarlyStopping(monitor="val_loss", patience=2, min_delta=0, mode='auto', verbose=1)
+        self.monitor = EarlyStopping(
+            monitor="val_loss", patience=2, min_delta=0, mode="auto", verbose=1
+        )
 
         self.checkpoint = ModelCheckpoint(
             checkpoint_file,
@@ -231,20 +213,21 @@ def xtract_primal(x):
             win_length=nn_time_win,
             hop_length=int(0.5 * nn_time_win),
         )
-        Spmag = numpy.abs(Sp)
+        Spmag, Sphase_orig = librosa.magphase(Sp)
 
-        Spmag_for_nn = numpy.reshape(Spmag, (1, 1025, 87, 1))
+        Spmag_for_nn = numpy.reshape(Spmag, (1, stft_nfft, n_frames, 1))
 
         # inference from model
-        Spmag_desired_from_nn = model.predict(Spmag_for_nn)
-        Spmag_desired = numpy.reshape(Spmag_desired_from_nn, (1025, 87))
+        Spmag_from_nn = model.predict(Spmag_for_nn)
+        Spmag_from_nn = numpy.reshape(Spmag_from_nn, (stft_nfft, n_frames))
 
-        mask = numpy.divide(Spmag_desired, Spmag)
-
-        Sp_nn = numpy.multiply(mask, Sp)
+        # use inference magnitude + original phase as specified in the paper
+        Sp_desired = _pol2cart(Spmag_from_nn, Sphase_orig)
 
         s_p_nn = fix_length(
-            istft(Sp_nn, win_length=nn_time_win, hop_length=int(0.5 * nn_time_win)),
+            istft(
+                Sp_desired, win_length=nn_time_win, hop_length=int(0.5 * nn_time_win)
+            ),
             len(s_p),
         )
         x_out[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p_nn

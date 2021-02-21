@@ -1,5 +1,4 @@
 import h5py
-import json
 import sys
 import os
 import numpy
@@ -9,15 +8,7 @@ import scipy
 import librosa
 from librosa.core import stft
 from .. import xtract_primitive
-
-
-mypath = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.join(mypath, "data")
-with open(os.path.join(mypath, "../../params.json")) as f:
-    params = json.load(f)
-chunk_size = params["chunk_size"]
-perc_time_win = params["stft_window_size"]
-sample_rate = params["sample_rate"]
+from ..params import chunk_size, nn_time_win, sample_rate
 
 
 def compute_hdf5_row(tup):
@@ -49,17 +40,17 @@ def compute_hdf5_row(tup):
 
         Xsep = stft(
             x_sep_chunk,
-            n_fft=2 * perc_time_win,
-            win_length=perc_time_win,
-            hop_length=int(0.5 * perc_time_win),
+            n_fft=2 * nn_time_win,
+            win_length=nn_time_win,
+            hop_length=int(0.5 * nn_time_win),
         )
         Xsepmag = numpy.abs(Xsep)
 
         Xref = stft(
             x_ref_chunk,
-            n_fft=2 * perc_time_win,
-            win_length=perc_time_win,
-            hop_length=int(0.5 * perc_time_win),
+            n_fft=2 * nn_time_win,
+            win_length=nn_time_win,
+            hop_length=int(0.5 * nn_time_win),
         )
         Xrefmag = numpy.abs(Xref)
 
