@@ -18,6 +18,7 @@ from primalx.params import (
     checkpoint_dir,
     data_hdf5_file,
     stft_nfft,
+    n_frames,
 )
 from primalx.dataprep import prepare_stems, compute_hdf5_row
 from sklearn.model_selection import train_test_split
@@ -113,19 +114,28 @@ def prepare_data(args):
         ref = os.path.join(data_dir, track, ref)
         testcases.append((mix, ref))
 
-    outputs = list(
-        itertools.chain.from_iterable(
-            pool.starmap(
-                compute_hdf5_row,
-                zip(
-                    testcases,
-                ),
-            )
-        )
-    )
-
     with h5py.File(data_hdf5_file, "w") as hf:
-        hf.create_dataset("data", data=outputs)
+        dataset = hf.create_dataset("data", (1, n_frames, 2*stft_nfft), maxshape=(None, n_frames, 2*stft_nfft))
+
+        for i in range(0, len(testcases)-1, args.n_pool):
+            limited_testcases = testcases[i:i+args.n_pool]
+
+            outputs = list(
+                itertools.chain.from_iterable(
+                    pool.starmap(
+                        compute_hdf5_row,
+                        zip(
+                            limited_testcases,
+                        ),
+                    )
+                )
+            )
+            to_add = numpy.asarray(outputs)
+
+            # we have 
+            dataset.resize((dataset.shape[0] + to_add.shape[0]), axis=0)
+            dataset[-to_add.shape[0]:, :, :] = to_add
+        print('dataset final shape: {0}'.format(dataset.shape))
 
 
 def train_network(args):
