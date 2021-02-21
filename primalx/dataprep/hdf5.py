@@ -7,6 +7,7 @@ import itertools
 import scipy
 import librosa
 from librosa.core import stft
+from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 from .. import xtract_primitive
 from ..params import chunk_size, nn_time_win, sample_rate
 
@@ -32,32 +33,46 @@ def compute_hdf5_row(tup):
     x_ref = numpy.concatenate((x_ref, numpy.zeros(n_pad)))
 
     print("Applying primitive drum extraction")
-    x_sep = xtract_primitive(x_mix)
+    #x_sep = xtract_primitive(x_mix)
+    x_sep = x_mix
+
+    scl = BarkScale(0, 22050, 96)
+
+    # calculate transform parameters
+    L = chunk_size
+    nsgt = NSGT(scl, sample_rate, L, real=True, matrixform=True)
 
     for chunk in range(n_chunks - 1):
         x_sep_chunk = x_sep[chunk * chunk_size : (chunk + 1) * chunk_size]
         x_ref_chunk = x_ref[chunk * chunk_size : (chunk + 1) * chunk_size]
 
-        Xsep = stft(
-            x_sep_chunk,
-            n_fft=2 * nn_time_win,
-            win_length=nn_time_win,
-            hop_length=int(0.5 * nn_time_win),
-        )
-        Xsepmag = numpy.abs(Xsep)
+        # forward transform
+        csep = nsgt.forward(x_sep_chunk)
+        Csep = numpy.asarray(csep)
 
-        Xref = stft(
-            x_ref_chunk,
-            n_fft=2 * nn_time_win,
-            win_length=nn_time_win,
-            hop_length=int(0.5 * nn_time_win),
-        )
-        Xrefmag = numpy.abs(Xref)
+        Cmagsep = numpy.abs(Csep)
 
-        spec_in.append(Xsepmag)
-        spec_out.append(Xrefmag)
+        cref = nsgt.forward(x_ref_chunk)
+        Cref = numpy.asarray(cref)
+
+        Cmagref = numpy.abs(Cref)
+
+        print('Csep: ')
+        print(Csep.shape)
+        print(Csep.dtype)
+        print(Cmagsep.shape)
+        print(Cmagsep.dtype)
+
+        print('Cref: ')
+        print(Cref.shape)
+        print(Cref.dtype)
+        print(Cmagref.shape)
+        print(Cmagref.dtype)
+        
+        spec_in.append(Cmagsep)
+        spec_out.append(Cmagref)
 
     for spec_pairs in zip(spec_in, spec_out):
-        all_ndarray_rows.append(numpy.concatenate((spec_pairs[0], spec_pairs[1])))
+        all_ndarray_rows.append(numpy.concatenate((spec_pairs[0], spec_pairs[1]), axis=1))
 
     return all_ndarray_rows

@@ -56,7 +56,7 @@ def _create_model():
     # 87 frames of chunk_size, 44032 samples each
     # 2 channel for complex STFT (real and imaginary stored separately)
     model = Sequential()
-    model.add(Input(shape=(stft_nfft, n_frames, 1)))
+    model.add(Input(shape=(n_frames, stft_nfft, 1)))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(
         MaxPooling2D(pool_size=(3, 5), strides=None, padding="same", data_format=None)
@@ -72,8 +72,9 @@ def _create_model():
     model.add(UpSampling2D(size=(1, 5), data_format=None, interpolation="nearest"))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
+
     model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
-    model.add(Cropping2D(cropping=((0, 1), (0, 13))))
+    model.add(Cropping2D(cropping=((0, 0), (0, 2))))
 
     model.compile(loss="mae", optimizer="adam", metrics=["mae"])
 
@@ -174,62 +175,71 @@ def xtract_primal(x):
         c = nsgt.forward(s)
         C = numpy.asarray(c)
 
-        Cmag = numpy.abs(C)
+        Cmag_orig, Cphase_orig = librosa.magphase(C)
 
         # two iterations of CQT median filtering
-        for i in range(2):
-            _, Mp = hpss(Cmag, power=2.0, margin=1.0, kernel_size=(17, 7), mask=True)
-            Cp = numpy.multiply(Mp, C)
-            Cmag = Cp
+        #for i in range(2):
+        #    _, Mp = hpss(Cmag, power=2.0, margin=1.0, kernel_size=(17, 7), mask=True)
+        #    Cp = numpy.multiply(Mp, C)
+        #    Cmag = Cp
 
-        # inverse transform
-        s_r = nsgt.backward(Cp)
-
-        perc_time_win = 2048
-
-        S = stft(
-            s_r,
-            n_fft=2 * perc_time_win,
-            win_length=perc_time_win,
-            hop_length=int(0.5 * perc_time_win),
-        )
-        Smag = numpy.abs(S)
-
-        # two iterations of STFT median filtering
-        for i in range(2):
-            _, Mp = hpss(Smag, power=2.0, margin=1.0, kernel_size=(17, 17), mask=True)
-            Sp = numpy.multiply(Mp, S)
-            Smag = Sp
-
-        s_p = fix_length(
-            istft(Sp, win_length=perc_time_win, hop_length=int(0.5 * perc_time_win)),
-            len(s_r),
-        )
-
-        # last step, apply learned network
-        Sp = stft(
-            s_p,
-            n_fft=2 * nn_time_win,
-            win_length=nn_time_win,
-            hop_length=int(0.5 * nn_time_win),
-        )
-        Spmag, Sphase_orig = librosa.magphase(Sp)
-
-        Spmag_for_nn = numpy.reshape(Spmag, (1, stft_nfft, n_frames, 1))
+        Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
 
         # inference from model
-        Spmag_from_nn = model.predict(Spmag_for_nn)
-        Spmag_from_nn = numpy.reshape(Spmag_from_nn, (stft_nfft, n_frames))
+        Cmag_from_nn = model.predict(Cmag_for_nn)
+        Cmag_from_nn = numpy.reshape(Cpmag_from_nn, (n_frames, stft_nfft))
 
-        # use inference magnitude + original phase as specified in the paper
-        Sp_desired = _pol2cart(Spmag_from_nn, Sphase_orig)
+        ## use inference magnitude + original phase as specified in the paper
+        C_desired = _pol2cart(Cmag_from_nn, Cmag_orig)
 
-        s_p_nn = fix_length(
-            istft(
-                Sp_desired, win_length=nn_time_win, hop_length=int(0.5 * nn_time_win)
-            ),
-            len(s_p),
-        )
+        # inverse transform
+        s_p_nn = nsgt.backward(C_desired)
+
+        #perc_time_win = 2048
+
+        #S = stft(
+        #    s_r,
+        #    n_fft=2 * perc_time_win,
+        #    win_length=perc_time_win,
+        #    hop_length=int(0.5 * perc_time_win),
+        #)
+        #Smag = numpy.abs(S)
+
+        ## two iterations of STFT median filtering
+        #for i in range(2):
+        #    _, Mp = hpss(Smag, power=2.0, margin=1.0, kernel_size=(17, 17), mask=True)
+        #    Sp = numpy.multiply(Mp, S)
+        #    Smag = Sp
+
+        #s_p = fix_length(
+        #    istft(Sp, win_length=perc_time_win, hop_length=int(0.5 * perc_time_win)),
+        #    len(s_r),
+        #)
+
+        # last step, apply learned network
+        #Sp = stft(
+        #    s_p,
+        #    n_fft=2 * nn_time_win,
+        #    win_length=nn_time_win,
+        #    hop_length=int(0.5 * nn_time_win),
+        #)
+        #Spmag_orig, Sphase_orig = librosa.magphase(Sp)
+
+        #Spmag_for_nn = numpy.reshape(Spmag_orig, (1, stft_nfft, n_frames, 1))
+
+        ## inference from model
+        #Spmag_from_nn = model.predict(Spmag_for_nn)
+        #Spmag_from_nn = numpy.reshape(Spmag_from_nn, (stft_nfft, n_frames))
+
+        ## use inference magnitude + original phase as specified in the paper
+        #Sp_desired = _pol2cart(Spmag_from_nn, Sphase_orig)
+
+        #s_p_nn = fix_length(
+        #    istft(
+        #        Sp_desired, win_length=nn_time_win, hop_length=int(0.5 * nn_time_win)
+        #    ),
+        #    len(s_p),
+        #)
         x_out[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p_nn
 
     # strip off padding

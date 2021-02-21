@@ -20,5 +20,7 @@ with open(os.path.join(mypath, "../params.json")) as f:
     sample_rate = params["sample_rate"]
 
     # nfft = nfft/2 + 1
-    stft_nfft = int(nn_time_win + 1)
-    n_frames = int(chunk_size / (int(0.5 * nn_time_win)) + 1)
+    #stft_nfft = int(nn_time_win + 1)
+    #n_frames = int(chunk_size / (int(0.5 * nn_time_win)) + 1)
+    n_frames = 96
+    stft_nfft = 1948

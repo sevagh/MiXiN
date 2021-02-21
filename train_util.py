@@ -146,12 +146,17 @@ def train_network(args):
 
     with h5py.File(data_hdf5_file, "r") as hf:
         data = hf["data"][:]
+        print(data.shape)
 
         # input spectrogram
-        X = numpy.copy(data[:, :stft_nfft, :])
+        X = numpy.copy(data[:, :, :stft_nfft])
+
+        print(X.shape)
 
         # output spectrogram
-        Y = numpy.copy(data[:, stft_nfft:, :])
+        Y = numpy.copy(data[:, :, stft_nfft:])
+
+        print(Y.shape)
 
         # split into 90/10. then pass validation_split to keras fit
         X_train, X_test, Y_train, Y_test = train_test_split(
@@ -171,6 +176,12 @@ def train_network(args):
         Y_test = numpy.reshape(
             Y_test, (Y_test.shape[0], Y_test.shape[1], Y_test.shape[2], 1)
         )
+
+        print(X_train.shape)
+        print(Y_train.shape)
+
+        print(X_test.shape)
+        print(Y_test.shape)
 
         model.train(X_train, Y_train, plot=args.plot_training)
         model.evaluate_scores(X_train, Y_train, "train")
