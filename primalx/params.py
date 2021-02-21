@@ -11,17 +11,17 @@ components = {
     "percussive": {
         "data_hdf5_file": os.path.join(data_dir, "data_percussive.hdf5"),
         "model_file": os.path.join(model_dir, "model_percussive.h5"),
-        "checkpoint_file": os.path.join(model_dir, "model_percussive.ckpt"),
+        "checkpoint_file": os.path.join(checkpoint_dir, "model_percussive.ckpt"),
     },
     "harmonic": {
         "data_hdf5_file": os.path.join(data_dir, "data_harmonic.hdf5"),
         "model_file": os.path.join(model_dir, "model_harmonic.h5"),
-        "checkpoint_file": os.path.join(model_dir, "model_harmonic.ckpt"),
+        "checkpoint_file": os.path.join(checkpoint_dir, "model_harmonic.ckpt"),
     },
     "vocal": {
         "data_hdf5_file": os.path.join(data_dir, "data_vocal.hdf5"),
         "model_file": os.path.join(model_dir, "model_vocal.h5"),
-        "checkpoint_file": os.path.join(model_dir, "model_vocal.ckpt"),
+        "checkpoint_file": os.path.join(checkpoint_dir, "model_vocal.ckpt"),
     },
 }
 

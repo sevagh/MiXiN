@@ -1,6 +1,7 @@
 import os
 import numpy
 import tensorflow
+import librosa
 from keras.models import Sequential, load_model
 from keras.layers import (
     Conv2D,
@@ -133,7 +134,7 @@ class Model:
         self.model.summary()
 
 
-def xtract_primal(x, power=None, beta=None):
+def xtract_primal(x, instrumental=False, power=None, beta=None, single_model=False):
     if (power is None) == (beta is None):
         raise ValueError(
             "supply one of power (2.0 = default, soft masking/wiener filter) or beta (2.0 default, separation factor for hard masking)"
@@ -178,7 +179,7 @@ def xtract_primal(x, power=None, beta=None):
         c = nsgt.forward(s)
         C = numpy.asarray(c)
 
-        Cmag_orig = numpy.abs(C)
+        Cmag_orig, Cphase_orig = librosa.magphase(C)
         Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
 
         # inference from model
@@ -188,37 +189,46 @@ def xtract_primal(x, power=None, beta=None):
         Cmag_h = harmonic_model.predict(Cmag_for_nn)
         Cmag_h = numpy.reshape(Cmag_h, (n_frames, stft_nfft))
 
-        Cmag_v = vocal_model.predict(Cmag_for_nn)
-        Cmag_v = numpy.reshape(Cmag_v, (n_frames, stft_nfft))
+        Cmag_v = numpy.zeros_like(Cmag_h)
+        if not instrumental:
+            Cmag_v = vocal_model.predict(Cmag_for_nn)
+            Cmag_v = numpy.reshape(Cmag_v, (n_frames, stft_nfft))
 
-        # soft mask first
-        Mp = numpy.ones_like(Cmag_orig)
-        Mh = numpy.ones_like(Cmag_orig)
-        Mv = numpy.ones_like(Cmag_orig)
+        if single_model:
+            Ch_desired = _pol2cart(Cmag_h, Cphase_orig)
+            Cp_desired = _pol2cart(Cmag_p, Cphase_orig)
 
-        if power:
-            tot = (
-                numpy.power(Cmag_p, power)
-                + numpy.power(Cmag_h, power)
-                + numpy.power(Cmag_v, power)
-                + K.epsilon()
-            )
-            Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
-            Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
-            Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
-        elif beta:
-            Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon()) >= beta
-            Mh = numpy.divide(Cmag_h, Cmag_p + Cmag_v + K.epsilon()) >= beta
-            Mv = numpy.divide(Cmag_v, Cmag_p + Cmag_h + K.epsilon()) >= beta
+            if not instrumental:
+                Cv_desired = _pol2cart(Cmag_v, Cphase_orig)
+        else:
+            # soft mask first
+            Mp = numpy.ones_like(Cmag_orig)
+            Mh = numpy.ones_like(Cmag_orig)
+            Mv = numpy.ones_like(Cmag_orig)
 
-            # turn into a binary mask of 1s and 0s
-            Mp = Mp.astype(numpy.int)
-            Mh = Mh.astype(numpy.int)
-            Mv = Mv.astype(numpy.int)
+            if power:
+                tot = (
+                    numpy.power(Cmag_p, power)
+                    + numpy.power(Cmag_h, power)
+                    + numpy.power(Cmag_v, power)
+                    + K.epsilon()
+                )
+                Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
+                Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
+                Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
+            elif beta:
+                Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon()) >= beta
+                Mh = numpy.divide(Cmag_h, Cmag_p + Cmag_v + K.epsilon()) >= beta
+                Mv = numpy.divide(Cmag_v, Cmag_p + Cmag_h + K.epsilon()) >= beta
 
-        Cp_desired = numpy.multiply(Mp, C)
-        Ch_desired = numpy.multiply(Mh, C)
-        Cv_desired = numpy.multiply(Mv, C)
+                # turn into a binary mask of 1s and 0s
+                Mp = Mp.astype(numpy.int)
+                Mh = Mh.astype(numpy.int)
+                Mv = Mv.astype(numpy.int)
+
+            Cp_desired = numpy.multiply(Mp, C)
+            Ch_desired = numpy.multiply(Mh, C)
+            Cv_desired = numpy.multiply(Mv, C)
 
         # inverse transform
         s_p = nsgt.backward(Cp_desired)
