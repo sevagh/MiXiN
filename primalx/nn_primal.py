@@ -108,14 +108,13 @@ class Model:
             mode="auto",
         )
 
-    def train(self, X_train, Y_train, X_val, Y_val, batch_size=64, epochs=100, validation_split=0.1, plot=False):
+    def train(self, XY_train, XY_val, epochs=100, plot=False):
         history = self.model.fit(
-            X_train,
-            Y_train,
-            batch_size=batch_size,
+            XY_train,
+            steps_per_epoch=1,
             epochs=epochs,
             callbacks=[self.monitor, self.checkpoint],
-            validation_data=(X_val, Y_val),
+            validation_data=XY_val,
             verbose=1,
         )
         if plot:
@@ -135,8 +134,8 @@ class Model:
             plt.legend(["train", "validation"], loc="upper left")
             plt.show()
 
-    def evaluate_scores(self, X, Y, name):
-        scores = self.model.evaluate(X, Y)
+    def evaluate_scores(self, XY, name):
+        scores = self.model.evaluate(XY)
         print(
             "%s scores: %s: %.2f%%"
             % (name, self.model.metrics_names[1], scores[1] * 100)

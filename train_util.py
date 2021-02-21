@@ -11,6 +11,7 @@ import shutil
 import itertools
 from essentia.standard import MonoLoader
 import tensorflow_io as tfio
+import tensorflow as tf
 import soundfile
 from primalx import Model
 from primalx.params import (
@@ -131,17 +132,41 @@ def prepare_data(args):
             testcases.append((mix, ref))
 
         with h5py.File(data_hdf5_file, "w") as hf:
-            x_train_dataset = hf.create_dataset("data-x-train", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
-            y_train_dataset = hf.create_dataset("data-y-train", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            x_train_dataset = hf.create_dataset(
+                "data-x-train",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
+            y_train_dataset = hf.create_dataset(
+                "data-y-train",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
 
-            x_test_dataset = hf.create_dataset("data-x-test", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
-            y_test_dataset = hf.create_dataset("data-y-test", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            x_test_dataset = hf.create_dataset(
+                "data-x-test",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
+            y_test_dataset = hf.create_dataset(
+                "data-y-test",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
 
-            x_validation_dataset = hf.create_dataset("data-x-validation", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
-            y_validation_dataset = hf.create_dataset("data-y-validation", (1, n_frames, stft_nfft), maxshape=(None, n_frames, stft_nfft))
+            x_validation_dataset = hf.create_dataset(
+                "data-x-validation",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
+            y_validation_dataset = hf.create_dataset(
+                "data-y-validation",
+                (1, n_frames, stft_nfft, 1),
+                maxshape=(None, n_frames, stft_nfft, 1),
+            )
 
-            for i in range(0, len(testcases)-1, args.n_pool):
-                limited_testcases = testcases[i:i+args.n_pool]
+            for i in range(0, len(testcases) - 1, args.n_pool):
+                limited_testcases = testcases[i : i + args.n_pool]
 
                 outputs = list(
                     itertools.chain.from_iterable(
@@ -155,12 +180,12 @@ def prepare_data(args):
                 )
                 to_add = numpy.asarray(outputs)
 
-                train_idx = int(TRAIN*to_add.shape[0])
-                test_idx = int(VALIDATION*to_add.shape[0])
+                train_idx = int(TRAIN * to_add.shape[0])
+                test_idx = int(VALIDATION * to_add.shape[0])
 
                 to_add_train = to_add[:train_idx, :, :]
-                to_add_test = to_add[train_idx:train_idx+test_idx, :, :]
-                to_add_validation = to_add[train_idx+test_idx:, :, :]
+                to_add_test = to_add[train_idx : train_idx + test_idx, :, :]
+                to_add_validation = to_add[train_idx + test_idx :, :, :]
 
                 to_add_x_train = to_add_train[:, :, :stft_nfft]
                 to_add_y_train = to_add_train[:, :, stft_nfft:]
@@ -171,30 +196,84 @@ def prepare_data(args):
                 to_add_x_validation = to_add_validation[:, :, :stft_nfft]
                 to_add_y_validation = to_add_validation[:, :, stft_nfft:]
 
-                print('TRAIN/TEST/VALIDATION SPLIT:\n\tall: {0}\n\ttrain: {1}\n\ttest: {2}\n\tvalidation: {3}'.format(
-                    to_add.shape,
-                    to_add_train.shape,
-                    to_add_test.shape,
-                    to_add_validation.shape
-                ))
+                print(
+                    "TRAIN/TEST/VALIDATION SPLIT:\n\tall: {0}\n\ttrain: {1}\n\ttest: {2}\n\tvalidation: {3}".format(
+                        to_add.shape,
+                        to_add_train.shape,
+                        to_add_test.shape,
+                        to_add_validation.shape,
+                    )
+                )
 
-                x_train_dataset.resize((x_train_dataset.shape[0] + to_add_x_train.shape[0]), axis=0)
-                x_train_dataset[-to_add_x_train.shape[0]:, :, :] = to_add_x_train
+                x_train_dataset.resize(
+                    (x_train_dataset.shape[0] + to_add_x_train.shape[0]), axis=0
+                )
+                x_train_dataset[
+                    -to_add_x_train.shape[0] :, :, :
+                ] = to_add_x_train.reshape(
+                    to_add_x_train.shape[0],
+                    to_add_x_train.shape[1],
+                    to_add_x_train.shape[2],
+                    1,
+                )
 
-                y_train_dataset.resize((y_train_dataset.shape[0] + to_add_y_train.shape[0]), axis=0)
-                y_train_dataset[-to_add_y_train.shape[0]:, :, :] = to_add_y_train
+                y_train_dataset.resize(
+                    (y_train_dataset.shape[0] + to_add_y_train.shape[0]), axis=0
+                )
+                y_train_dataset[
+                    -to_add_y_train.shape[0] :, :, :
+                ] = to_add_y_train.reshape(
+                    to_add_y_train.shape[0],
+                    to_add_y_train.shape[1],
+                    to_add_y_train.shape[2],
+                    1,
+                )
 
-                x_test_dataset.resize((x_test_dataset.shape[0] + to_add_x_test.shape[0]), axis=0)
-                x_test_dataset[-to_add_x_test.shape[0]:, :, :] = to_add_x_test
+                x_test_dataset.resize(
+                    (x_test_dataset.shape[0] + to_add_x_test.shape[0]), axis=0
+                )
+                x_test_dataset[-to_add_x_test.shape[0] :, :, :] = to_add_x_test.reshape(
+                    to_add_x_test.shape[0],
+                    to_add_x_test.shape[1],
+                    to_add_x_test.shape[2],
+                    1,
+                )
 
-                y_test_dataset.resize((y_test_dataset.shape[0] + to_add_y_test.shape[0]), axis=0)
-                y_test_dataset[-to_add_y_test.shape[0]:, :, :] = to_add_y_test
+                y_test_dataset.resize(
+                    (y_test_dataset.shape[0] + to_add_y_test.shape[0]), axis=0
+                )
+                y_test_dataset[-to_add_y_test.shape[0] :, :, :] = to_add_y_test.reshape(
+                    to_add_y_test.shape[0],
+                    to_add_y_test.shape[1],
+                    to_add_y_test.shape[2],
+                    1,
+                )
 
-                x_validation_dataset.resize((x_validation_dataset.shape[0] + to_add_x_validation.shape[0]), axis=0)
-                x_validation_dataset[-to_add_x_validation.shape[0]:, :, :] = to_add_x_validation
+                x_validation_dataset.resize(
+                    (x_validation_dataset.shape[0] + to_add_x_validation.shape[0]),
+                    axis=0,
+                )
+                x_validation_dataset[
+                    -to_add_x_validation.shape[0] :, :, :
+                ] = to_add_x_validation.reshape(
+                    to_add_x_validation.shape[0],
+                    to_add_x_validation.shape[1],
+                    to_add_x_validation.shape[2],
+                    1,
+                )
 
-                y_validation_dataset.resize((y_validation_dataset.shape[0] + to_add_y_validation.shape[0]), axis=0)
-                y_validation_dataset[-to_add_y_validation.shape[0]:, :, :] = to_add_y_validation
+                y_validation_dataset.resize(
+                    (y_validation_dataset.shape[0] + to_add_y_validation.shape[0]),
+                    axis=0,
+                )
+                y_validation_dataset[
+                    -to_add_y_validation.shape[0] :, :, :
+                ] = to_add_y_validation.reshape(
+                    to_add_y_validation.shape[0],
+                    to_add_y_validation.shape[1],
+                    to_add_y_validation.shape[2],
+                    1,
+                )
 
 
 def train_network(args):
@@ -219,13 +298,23 @@ def train_network(args):
     X_test = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-x-test")
     Y_test = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-y-test")
 
-    X_validation = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-x-validation")
-    Y_validation = tfio.IODataset.from_hdf5(data_hdf5_file, dataset="/data-y-validation")
+    X_validation = tfio.IODataset.from_hdf5(
+        data_hdf5_file, dataset="/data-x-validation"
+    )
+    Y_validation = tfio.IODataset.from_hdf5(
+        data_hdf5_file, dataset="/data-y-validation"
+    )
 
-    model.train(X_train, Y_train, X_validation, Y_validation, plot=args.plot_training)
-    model.evaluate_scores(X_train, Y_train, "train")
-    model.evaluate_scores(X_val, Y_val, "validation")
-    model.evaluate_scores(X_test, Y_test, "test")
+    train_data_set = tf.data.Dataset.zip((X_train.batch(64), Y_train.batch(64)))
+    test_data_set = tf.data.Dataset.zip((X_test.batch(64), Y_test.batch(64)))
+    validation_data_set = tf.data.Dataset.zip(
+        (X_validation.batch(64), Y_validation.batch(64))
+    )
+
+    model.train(train_data_set, validation_data_set, plot=args.plot_training)
+    model.evaluate_scores(train_data_set, "train")
+    model.evaluate_scores(validation_data_set, "validation")
+    model.evaluate_scores(test_data_set, "test")
 
     print("saving model")
     model.save()
