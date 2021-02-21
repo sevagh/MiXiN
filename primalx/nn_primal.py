@@ -5,7 +5,7 @@ import numpy
 from keras.models import load_model
 import tensorflow
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dense
+from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Dense, Cropping2D
 import numpy
 from nsgt import NSGT, LogScale, LinScale, MelScale, OctScale, BarkScale
 import scipy.io.wavfile
@@ -63,7 +63,8 @@ def _create_model():
     model.add(UpSampling2D(size=(1, 5), data_format=None, interpolation="nearest"))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
-    model.add(Conv2D(1, kernel_size=3, activation="relu", padding="same"))
+    model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
+    model.add(Cropping2D(cropping=((0, 1), (0, 13))))
     model.compile(loss="mae", optimizer="adam", metrics=["mae"])
 
     return model
@@ -131,6 +132,10 @@ class Model:
 
     def save(self):
         self.model.save(model_file)
+        self.model.summary()
+
+    def build_and_summary(self):
+        self.model.build(input_shape=(None, 1025, 87, 1))
         self.model.summary()
 
 
@@ -201,7 +206,7 @@ def xtract_primal(x):
         Spmag = numpy.abs(Sp)
         print(Spmag.shape)
 
-        Spmag_for_nn = numpy.reshape(Spmag, (1, 1, 1025, 87))
+        Spmag_for_nn = numpy.reshape(Spmag, (1, 1025, 87, 1))
 
         # inference from model
         Spmag_from_nn = model.predict(Spmag_for_nn)

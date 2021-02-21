@@ -122,6 +122,7 @@ def train_network(args):
         shutil.rmtree(checkpoint_dir)
 
     model = Model()
+    model.build_and_summary()
 
     with h5py.File(data_hdf5_file, "r") as hf:
         data = hf["data"][:]
@@ -137,18 +138,18 @@ def train_network(args):
         )
 
         X_train = numpy.reshape(
-            X_train, (X_train.shape[0], 1, X_train.shape[1], X_train.shape[2])
+            X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2], 1)
         )
         Y_train = numpy.reshape(
-            Y_train, (Y_train.shape[0], 1, Y_train.shape[1], Y_train.shape[2])
+            Y_train, (Y_train.shape[0], Y_train.shape[1], Y_train.shape[2], 1)
         )
         # Y_train = numpy.reshape(Y_train, (Y_train.shape[0], 1, 1025*87))
 
         X_test = numpy.reshape(
-            X_test, (X_test.shape[0], 1, X_test.shape[1], X_test.shape[2])
+            X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2], 1)
         )
         Y_test = numpy.reshape(
-            Y_test, (Y_test.shape[0], 1, Y_test.shape[1], Y_test.shape[2])
+            Y_test, (Y_test.shape[0], Y_test.shape[1], Y_test.shape[2], 1)
         )
         # Y_test = numpy.reshape(Y_test, (Y_test.shape[0], 1, 1025*87))
 
