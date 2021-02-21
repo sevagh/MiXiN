@@ -28,12 +28,12 @@ def prepare_stems(
                     print("Found directory containing wav files: %d" % seq)
                     print(os.path.basename(dir_name).replace(" ", "_"))
                     loaded_wavs = [None] * len(instruments)
-                    drum_track_index = -1
+                    percussive_track_index = -1
                     vocal_track_index = -1
                     mix_track_index = -1
                     for i, instrument in enumerate(instruments):
                         if "drum" in instrument.lower():
-                            drum_track_index = i
+                            percussive_track_index = i
                         elif "vocal" in instrument.lower():
                             vocal_track_index = i
                         elif "mix" in instrument.lower():
@@ -51,26 +51,25 @@ def prepare_stems(
                         for i in range(1, len(loaded_wavs))
                     )
 
-                    interf_mix_novocal = sum(
+                    harmonic_mix = sum(
                         [
                             l
                             for i, l in enumerate(loaded_wavs)
                             if i
                             not in [
-                                drum_track_index,
+                                percussive_track_index,
                                 vocal_track_index,
-                                mix_track_index,
+                                mix_track_index, # skip auto-mix, make our own
                             ]
                         ]
                     )
-                    interf_mix_vocal = (
-                        interf_mix_novocal + loaded_wavs[vocal_track_index]
+                    full_mix_vocal = (
+                        harmonic_mix + loaded_wavs[vocal_track_index] + loaded_wavs[percussive_track_index]
                     )
 
                     full_mix_novocal = (
-                        interf_mix_novocal + loaded_wavs[drum_track_index]
+                        harmonic_mix + loaded_wavs[percussive_track_index]
                     )
-                    full_mix_vocal = interf_mix_vocal + loaded_wavs[drum_track_index]
 
                     seg_samples = int(numpy.floor(segment_duration * sample_rate))
                     total_segs = int(numpy.floor(track_len / seg_samples))
@@ -94,39 +93,43 @@ def prepare_stems(
                         left = seg * seg_samples
                         right = (seg + 1) * seg_samples
 
-                        harm_path_nov = os.path.join(seqdirnov, "interf.wav")
+                        harm_path_nov = os.path.join(seqdirnov, "harmonic.wav")
                         mix_path_nov = os.path.join(seqdirnov, "mix.wav")
-                        perc_path_nov = os.path.join(seqdirnov, "drum.wav")
+                        perc_path_nov = os.path.join(seqdirnov, "percussive.wav")
 
                         soundfile.write(
-                            harm_path_nov, interf_mix_novocal[left:right], sample_rate
+                            harm_path_nov, harmonic_mix[left:right], sample_rate
                         )
                         soundfile.write(
                             mix_path_nov, full_mix_novocal[left:right], sample_rate
                         )
 
-                        # write the drum track
+                        # write the percussive track
                         soundfile.write(
                             perc_path_nov,
-                            loaded_wavs[drum_track_index][left:right],
+                            loaded_wavs[percussive_track_index][left:right],
                             sample_rate,
                         )
 
-                        harm_path_v = os.path.join(seqdirv, "interf.wav")
+                        harm_path_v = os.path.join(seqdirv, "harmonic.wav")
+                        vocal_path_v = os.path.join(seqdirv, "vocal.wav")
                         mix_path_v = os.path.join(seqdirv, "mix.wav")
-                        perc_path_v = os.path.join(seqdirv, "drum.wav")
+                        perc_path_v = os.path.join(seqdirv, "percussive.wav")
 
                         soundfile.write(
-                            harm_path_v, interf_mix_vocal[left:right], sample_rate
+                            harm_path_v, harmonic_mix[left:right], sample_rate
                         )
                         soundfile.write(
                             mix_path_v, full_mix_vocal[left:right], sample_rate
                         )
+                        soundfile.write(
+                            vocal_path_v, loaded_wavs[vocal_track_index][left:right], sample_rate
+                        )
 
-                        # write the drum track
+                        # write the percussive track
                         soundfile.write(
                             perc_path_v,
-                            loaded_wavs[drum_track_index][left:right],
+                            loaded_wavs[percussive_track_index][left:right],
                             sample_rate,
                         )
 

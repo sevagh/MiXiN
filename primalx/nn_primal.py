@@ -10,7 +10,6 @@ from keras.layers import (
     UpSampling2D,
     Dense,
     Cropping2D,
-    ZeroPadding2D,
     Input,
 )
 import numpy
@@ -34,10 +33,10 @@ from .params import (
     sample_rate,
     stft_nfft,
     n_frames,
-    model_file,
     model_dir,
     checkpoint_dir,
-    checkpoint_file,
+    conv_kernel_crop,
+    components,
 )
 
 physical_devices = tensorflow.config.list_physical_devices("GPU")
@@ -73,7 +72,7 @@ def _create_model():
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
 
     model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
-    model.add(Cropping2D(cropping=((0, 0), (0, 13))))
+    model.add(Cropping2D(cropping=((0, 0), (0, conv_kernel_crop))))
 
     model.compile(loss="mae", optimizer="adam", metrics=["mae"])
 
@@ -81,9 +80,11 @@ def _create_model():
 
 
 class Model:
-    def __init__(self):
+    def __init__(self, model_file, checkpoint_file):
+        self.model_file = model_file
+        self.checkpoint_file = checkpoint_file
         try:
-            self.model = load_model(model_file)
+            self.model = load_model(self.model_file)
             self.model.summary()
         except IOError:
             create_dirs = [model_dir, checkpoint_dir]
@@ -99,7 +100,7 @@ class Model:
         )
 
         self.checkpoint = ModelCheckpoint(
-            checkpoint_file,
+            self.checkpoint_file,
             monitor="val_loss",
             verbose=1,
             save_best_only=True,
@@ -140,7 +141,7 @@ class Model:
         )
 
     def save(self):
-        self.model.save(model_file)
+        self.model.save(self.model_file)
         self.model.summary()
 
     def build_and_summary(self):
@@ -148,7 +149,20 @@ class Model:
 
 
 def xtract_primal(x):
-    model = Model().model
+    percussive_model = Model(
+        components["percussive"]["model_file"],
+        components["percussive"]["checkpoint_file"],
+    ).model
+
+    harmonic_model = Model(
+        components["harmonic"]["model_file"],
+        components["harmonic"]["checkpoint_file"],
+    ).model
+
+    vocal_model = Model(
+        components["vocal"]["model_file"],
+        components["vocal"]["checkpoint_file"],
+    ).model
 
     n_samples = x.shape[0]
     n_chunks = int(numpy.ceil(n_samples / chunk_size))
@@ -178,15 +192,28 @@ def xtract_primal(x):
         remove primitive!
         '''
 
-        Cmag_orig, Cphase_orig = librosa.magphase(C)
+        Cmag_orig = numpy.abs(C) #librosa.magphase(C)
         Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
 
         # inference from model
-        Cmag_from_nn = model.predict(Cmag_for_nn)
-        Cmag_from_nn = numpy.reshape(Cmag_from_nn, (n_frames, stft_nfft))
+        Cmag_p = percussive_model.predict(Cmag_for_nn)
+        Cmag_p = numpy.reshape(Cmag_p, (n_frames, stft_nfft))
+
+        Cmag_h = harmonic_model.predict(Cmag_for_nn)
+        Cmag_h = numpy.reshape(Cmag_h, (n_frames, stft_nfft))
+
+        Cmag_v = vocal_model.predict(Cmag_for_nn)
+        Cmag_v = numpy.reshape(Cmag_v, (n_frames, stft_nfft))
+
+        #Mp = numpy.divide(Cmag_p, Cmag_h + Cmag_v + K.epsilon())
+
+        # soft mask first
+        Mp = numpy.divide(numpy.power(Cmag_p, 2.0), numpy.power(Cmag_p, 2.0) + numpy.power(Cmag_h, 2.0) + numpy.power(Cmag_v, 2.0) + K.epsilon())
 
         # use inference magnitude + original phase as specified in the paper
-        C_desired = _pol2cart(Cmag_from_nn, Cphase_orig)
+        #C_desired = _pol2cart(Cmag_from_nn, Cphase_orig)
+
+        C_desired = numpy.multiply(Mp, C)
 
         # inverse transform
         s_p = nsgt.backward(C_desired)
