@@ -16,12 +16,15 @@ if __name__ == "__main__":
     parser = ArgumentParser()
 
     parser.add_argument(
-        "--power", default=2.0, type=float, help="soft mask power, default %(default)s"
-    )
-    parser.add_argument(
         "--instrumental",
         action="store_true",
         help="use for instrumental songs (excludes the vocal model, which may improve quality of results)",
+    )
+    parser.add_argument(
+        "--outdir",
+        type=str,
+        default="./",
+        help="output directory",
     )
     parser.add_argument(
         "--single-model",
@@ -46,18 +49,21 @@ if __name__ == "__main__":
     x_h_out, x_p_out, x_v_out = xtract_mixin(
         x,
         instrumental=args.instrumental,
-        power=args.power,
         single_model=args.single_model,
         pretrained_model_dir=args.pretrained_model_dir,
     )
 
     song_name = os.path.splitext(os.path.basename(args.input))[0]
 
+    harm_dest = os.path.join(args.outdir, "{0}_harmonic.wav".format(song_name))
+    perc_dest = os.path.join(args.outdir, "{0}_percussive.wav".format(song_name))
+    vocal_dest = os.path.join(args.outdir, "{0}_vocal.wav".format(song_name))
+
     print("Writing harmonic and percussive audio files")
-    scipy.io.wavfile.write("{0}_harmonic.wav".format(song_name), sample_rate, x_h_out)
-    scipy.io.wavfile.write("{0}_percussive.wav".format(song_name), sample_rate, x_p_out)
+    scipy.io.wavfile.write(harm_dest, sample_rate, x_h_out)
+    scipy.io.wavfile.write(perc_dest, sample_rate, x_p_out)
 
     if not args.instrumental:
         print("Writing vocal audio files")
-        scipy.io.wavfile.write("{0}_vocal.wav".format(song_name), sample_rate, x_v_out)
+        scipy.io.wavfile.write(vocal_dest, sample_rate, x_v_out)
     print("Done")

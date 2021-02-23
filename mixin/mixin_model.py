@@ -131,9 +131,7 @@ class Model:
         self.model.summary()
 
 
-def xtract_mixin(
-    x, instrumental=False, power=2.0, single_model=False, pretrained_model_dir=None
-):
+def xtract_mixin(x, instrumental=False, single_model=False, pretrained_model_dir=None):
     if pretrained_model_dir is None:
         p_model = components["percussive"]["model_file"]
         h_model = components["harmonic"]["model_file"]
@@ -200,14 +198,14 @@ def xtract_mixin(
             Mv = numpy.ones_like(Cmag_orig)
 
             tot = (
-                numpy.power(Cmag_p, power)
-                + numpy.power(Cmag_h, power)
-                + numpy.power(Cmag_v, power)
+                numpy.power(Cmag_p, 2.0)
+                + numpy.power(Cmag_h, 2.0)
+                + numpy.power(Cmag_v, 2.0)
                 + K.epsilon()
             )
-            Mp = numpy.divide(numpy.power(Cmag_p, power), tot)
-            Mh = numpy.divide(numpy.power(Cmag_h, power), tot)
-            Mv = numpy.divide(numpy.power(Cmag_v, power), tot)
+            Mp = numpy.divide(numpy.power(Cmag_p, 2.0), tot)
+            Mh = numpy.divide(numpy.power(Cmag_h, 2.0), tot)
+            Mv = numpy.divide(numpy.power(Cmag_v, 2.0), tot)
 
             Cp_desired = numpy.multiply(Mp, C)
             Ch_desired = numpy.multiply(Mh, C)
@@ -216,7 +214,10 @@ def xtract_mixin(
         # inverse transform
         s_p = nsgt.backward(Cp_desired)
         s_h = nsgt.backward(Ch_desired)
-        s_v = nsgt.backward(Cv_desired)
+
+        s_v = numpy.zeros_like(s_h)
+        if not instrumental:
+            s_v = nsgt.backward(Cv_desired)
 
         x_out_p[chunk * chunk_size : (chunk + 1) * chunk_size] = s_p
         x_out_v[chunk * chunk_size : (chunk + 1) * chunk_size] = s_v
