@@ -36,16 +36,13 @@ def _pol2cart(rho, phi):
 
 
 def _create_model():
-    # stft with window size 1024, nfft = 2048 (nfft/2 + 1 outputs)
-    # 87 frames of chunk_size, 44032 samples each
-    # 2 channel for complex STFT (real and imaginary stored separately)
     model = Sequential()
     model.add(Input(shape=(n_frames, stft_nfft, 1)))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(
         MaxPooling2D(pool_size=(3, 5), strides=None, padding="same", data_format=None)
     )
-    model.add(Conv2D(20, kernel_size=3, activation="relu", padding="same"))  # 2*202*20
+    model.add(Conv2D(20, kernel_size=3, activation="relu", padding="same"))
     model.add(
         MaxPooling2D(pool_size=(1, 5), strides=None, padding="same", data_format=None)
     )

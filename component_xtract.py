@@ -8,6 +8,9 @@ from argparse import ArgumentParser
 import scipy
 import scipy.io.wavfile
 
+mypath = os.path.dirname(os.path.abspath(__file__))
+default_pretrained = os.path.join(mypath, "./pretrained-models")
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -28,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained-model-dir",
         type=str,
-        default=None,
+        default=default_pretrained,
         help="path to pretrained model directory (default of None uses ./model)",
     )
     parser.add_argument("input", type=str, help="input audio file")
