@@ -1,29 +1,17 @@
 #!/usr/bin/env python3
 
-import h5py
 import sys
 import multiprocessing
 import argparse
-import os
-import numpy
-import itertools
 import tensorflow_io as tfio
 import tensorflow as tf
 from mixin import Model
 from mixin.params import (
     data_dir,
-    model_dir,
-    checkpoint_dir,
-    stft_nfft,
-    n_frames,
     batch_size,
     components,
 )
 from mixin.dataprep import prepare_stems, create_hdf5_from_dir
-
-TRAIN = 0.8
-VALIDATION = 0.1
-TEST = 0.1
 
 
 def parse_args():
@@ -119,6 +107,7 @@ def train_network(args):
         )
 
         model.train(train_data_set, validation_data_set, plot=args.plot_training)
+        model.evaluate_scores(train_data_set, "train")
         model.evaluate_scores(validation_data_set, "validation")
         model.evaluate_scores(test_data_set, "test")
 
@@ -128,7 +117,6 @@ def train_network(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    print(args)
 
     if args.prepare_stems:
         if args.stem_dirs is None:

@@ -1,13 +1,21 @@
 import numpy
+import h5py
+import itertools
+import os
 import librosa
 import multiprocessing
 from nsgt import NSGT, BarkScale
-from ..params import chunk_size, sample_rate, components
-from .params import (
+from ..params import (
+    chunk_size,
+    sample_rate,
     stft_nfft,
     n_frames,
     components,
 )
+
+TRAIN = 0.8
+VALIDATION = 0.1
+TEST = 0.1
 
 
 def _compute_hdf5_row(tup):
