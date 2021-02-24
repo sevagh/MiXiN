@@ -4,14 +4,8 @@ import itertools
 import os
 import librosa
 import multiprocessing
-from nsgt import NSGT, BarkScale
-from ..params import (
-    chunk_size,
-    sample_rate,
-    stft_nfft,
-    n_frames,
-    components,
-)
+from nsgt import NSGT
+from ..params import chunk_size, sample_rate, dim_2, dim_1, components, nsgt_scale
 
 TRAIN = 0.8
 VALIDATION = 0.1
@@ -38,11 +32,9 @@ def _compute_hdf5_row(tup):
     x_mix = numpy.concatenate((x_mix, numpy.zeros(n_pad)))
     x_ref = numpy.concatenate((x_ref, numpy.zeros(n_pad)))
 
-    scl = BarkScale(0, 22050, 96)
-
     # calculate transform parameters
     L = chunk_size
-    nsgt = NSGT(scl, sample_rate, L, real=True, matrixform=True)
+    nsgt = NSGT(nsgt_scale, sample_rate, L, real=True, matrixform=True)
 
     for chunk in range(n_chunks - 1):
         x_mix_chunk = x_mix[chunk * chunk_size : (chunk + 1) * chunk_size]
@@ -109,35 +101,35 @@ def create_hdf5_from_dir(data_dir, n_pool):
         with h5py.File(component_files["data_hdf5_file"], "w") as hf:
             x_train_dataset = hf.create_dataset(
                 "data-x-train",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
             y_train_dataset = hf.create_dataset(
                 "data-y-train",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
 
             x_test_dataset = hf.create_dataset(
                 "data-x-test",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
             y_test_dataset = hf.create_dataset(
                 "data-y-test",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
 
             x_validation_dataset = hf.create_dataset(
                 "data-x-validation",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
             y_validation_dataset = hf.create_dataset(
                 "data-y-validation",
-                (1, n_frames, stft_nfft, 1),
-                maxshape=(None, n_frames, stft_nfft, 1),
+                (1, dim_1, dim_2, 1),
+                maxshape=(None, dim_1, dim_2, 1),
             )
 
             for i in range(0, len(testcases[component]) - 1, n_pool):
@@ -162,14 +154,14 @@ def create_hdf5_from_dir(data_dir, n_pool):
                 to_add_test = to_add[train_idx : train_idx + test_idx, :, :]
                 to_add_validation = to_add[train_idx + test_idx :, :, :]
 
-                to_add_x_train = to_add_train[:, :, :stft_nfft]
-                to_add_y_train = to_add_train[:, :, stft_nfft:]
+                to_add_x_train = to_add_train[:, :, :dim_2]
+                to_add_y_train = to_add_train[:, :, dim_2:]
 
-                to_add_x_test = to_add_test[:, :, :stft_nfft]
-                to_add_y_test = to_add_test[:, :, stft_nfft:]
+                to_add_x_test = to_add_test[:, :, :dim_2]
+                to_add_y_test = to_add_test[:, :, dim_2:]
 
-                to_add_x_validation = to_add_validation[:, :, :stft_nfft]
-                to_add_y_validation = to_add_validation[:, :, stft_nfft:]
+                to_add_x_validation = to_add_validation[:, :, :dim_2]
+                to_add_y_validation = to_add_validation[:, :, dim_2:]
 
                 print(
                     "{0} chunk {1} TRAIN/TEST/VALIDATION SPLIT:\n\tall data: {2}\n\ttrain: {3}\n\ttest: {4}\n\tvalidation: {5}".format(

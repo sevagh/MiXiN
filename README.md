@@ -2,7 +2,7 @@
 
 MiXiN, or **M**usic **X**traction with **N**onstationary Gabor Transforms, is a model for harmonic/percussive/vocal source separation based on [Convolutional Denoising Autoencoders](https://arxiv.org/abs/1703.08019). The pretrained models are trained on Periphery stems from the albums Juggernaut, Omega, Periphery III and Hail Stan (available for purchase [here](https://store.periphery.net/music/music)).
 
-MiXiN takes the simple [median-filtering HPSS](http://dafx10.iem.at/papers/DerryFitzGerald_DAFx10_P15.pdf) algorithm (which applies soft masks computed from harmonic and percussive magnitude estimates), replaces the STFT with an NSGT using 96 bins per Bark frequency band, and replaces the simple (but not so impressive) median filtering estimation step with trained CDAEs.
+MiXiN takes the simple [median-filtering HPSS](http://dafx10.iem.at/papers/DerryFitzGerald_DAFx10_P15.pdf) algorithm (which applies soft masks computed from harmonic and percussive magnitude estimates), replaces the STFT with an NSGT with 96 bands on the Bark frequency scale from 0-22050Hz, and replaces the simple (but not so impressive) median filtering estimation step with trained CDAEs.
 
 MiXiN has only been tested on my own Linux computer - if you experience any issues, or need help getting it running somewhere else, feel free to use GitHub issues to ask or suggest anything.
 
@@ -27,6 +27,10 @@ $ ./xtract_mixin.py ./mixed.wav
 $ ls *.wav
 mixed_harmonic.wav  mixed_percussive.wav  mixed_vocal.wav  mixed.wav
 ```
+
+There are two flags that affect the quality of separation:
+* `--single-model` uses the original CDAE strategy of using the network output magnitude + original mix phase to invert and create the separations. The default uses all 3 models to create per-component soft masks.
+* `--instrumental` ignores the vocal model. Useful for instrumental metal songs; you may get slightly better outputs.
 
 If you want to use MiXiN in your own code, take a look at `xtract_mixin.py` to see how it calls the mixin library. You'll know the pretrained models are loaded correctly if you see 3 different sets of Keras layers printed:
 ```
@@ -79,7 +83,7 @@ From the paper on [CDAEs for source separation](https://arxiv.org/abs/1703.08019
 
 The CDAE paper uses an STFT of 15 frames with a window size of 1024 (1025 FFT points, representing 2048/2 + 1 non-redundant spectral coefficients) to perform source separation, by training a separate CDAE for each source. One CDAE is recommended for each desired source. In MiXiN, the sources considered are harmonic/percussive/vocal - this is influenced by the [median-filtering HPSS](http://dafx10.iem.at/papers/DerryFitzGerald_DAFx10_P15.pdf) and [HPSS vocal separation with CQT](https://arrow.tudublin.ie/cgi/viewcontent.cgi?article=1007&context=argart) papers. This gives us an architecture with 3 CDAEs.
 
-In MiXiN, the Nonstationary Gabor Transform is used with 96 bins per ocatve and the Bark frequency scale from 0-22050 Hz, available in [my fork of the Python nsgt implementation](https://github.com/sevagh/nsgt). Think of the NSGT like an STFT with some useful time-frequency properties that might make it more amenable to musical applications - for further reading more musical time-frequency analyses, check out [Judith Brown's first paper on the CQT](https://www.ee.columbia.edu/~dpwe/papers/Brown91-cqt.pdf), [Monika Doerfler's dissertation](http://www.mathe.tu-freiberg.de/files/thesis/gamu_1.pdf) for a treatment of multiple Gabor dictionaries, and [paper 1](https://ltfat.github.io/notes/ltfatnote010.pdf), [paper 2](https://ltfat.github.io/notes/ltfatnote018.pdf) on NSGTs.
+In MiXiN, the Nonstationary Gabor Transform is used with 96 bands on the Bark scale from 0-22050 Hz using [my fork](https://github.com/sevagh/nsgt) of the Python [nsgt](https://github.com/grrrr/nsgt) library. Think of the NSGT like an STFT with some useful time-frequency properties that might make it more amenable to musical applications - for further reading more musical time-frequency analyses, check out [Judith Brown's first paper on the CQT](https://www.ee.columbia.edu/~dpwe/papers/Brown91-cqt.pdf), [Monika Doerfler's dissertation](http://www.mathe.tu-freiberg.de/files/thesis/gamu_1.pdf) for a treatment of multiple Gabor dictionaries, and [paper 1](https://ltfat.github.io/notes/ltfatnote010.pdf), [paper 2](https://ltfat.github.io/notes/ltfatnote018.pdf) on NSGTs.
 
 The signal is split into chunk sizes of 44032 samples (representing roughly 1s of audio, divisible by 1024), and NSGT is taken. The magnitude of the mixed audio NSGT coefficients is the input to all of the 3 CDAEs, and the outputs are the estimates of vocal, percussive, and harmonic magnitude NSGT coefficients.
 
@@ -121,10 +125,38 @@ MiXiN scores poorly, but to me it still sounds pretty good - I like the percussi
 
 ## Run tests, train your own models
 
-Run unit tests with:
+Run the end-to-end test (you must supply a stem dir). Pass `--delete` to automatically delete the `./data`, `./model`, and `./logdir` working directories. Use `2>/dev/null` to discard the verbose Tensorflow/Keras outputs.
+
+The e2e test runs a full cycle through:
+1. Keras CDAE layers and input/output dimensions check
+2. Stem segment preparation from original stems (e.g. in MUSDB18-HQ)
+3. Stem segment verification (duration, sample rate, appropriate components i.e. harmonic/percussive/vocal/mix)
+4. HDF5 file creation
+5. HDF5 file verification including test/train/validation sizes and NSGT input/output dimensionality 
+6. Training all 3 models
+7. Verifying existence of checkpoint dirs and saved h5 model files
 
 ```
+$ STEM_DIR=~/TRAINING-MUSIC/MUSDB18-HQ/test/ ./test_e2e.py --delete 2>/dev/null
+[MiXiN e2e test] Early sanity check - Keras model layers and dimensions...
+[MiXiN e2e test] good!
+[MiXiN e2e test] Deleting dirs...
+[MiXiN e2e test] Checking if dirs exist... dont want to overwrite user training
+[MiXiN e2e test] Checking if STEM_DIR is defined
+[MiXiN e2e test] Preparing stems with train util
+[MiXiN e2e test] Verifying prepared stems
+[MiXiN e2e test] Verifying prepared segments for audio properties
+[MiXiN e2e test] good
+[MiXiN e2e test] Creating hdf5 with train util
+[MiXiN e2e test] good
+[MiXiN e2e test] Verifying dimensionality of hdf5 files
+[MiXiN e2e test] good
+[MiXiN e2e test] Training the 3 networks
+[MiXiN e2e test] Verifying training outputs
+[MiXiN e2e test] finished!
 ```
+
+If the e2e test succeeds, chances are MiXiN will work fine for you.
 
 To train your own, use the `train_util.py` script.
 
@@ -187,7 +219,7 @@ $ ls data/*.hdf5
 data/data_harmonic.hdf5  data/data_percussive.hdf5  data/data_vocal.hdf5
 ```
 
-The dimensionality of the data is 96 x (2 * 1948), representing 2 concatenated NSGTs with 96 bins per Bark frequency band (described later in the architecture section), one for the mix, and one for the source. There are 2 segments (20s of audio total), which is split into chunks of ~1s before taking the NSGT. Vocal has half the data of harmonic/percussive since the same track is made into an instrumental and vocal mix.
+The dimensionality of the data is 96 x (2 * 1948), representing 2 concatenated NSGTs, one for the mix, and one for the source. There are 2 segments (20s of audio total), which is split into chunks of ~1s before taking the NSGT. Vocal has half the data of harmonic/percussive since the same track is made into an instrumental and vocal mix.
 
 **Step 3**, train the networks, which store checkpoints in `logdir` and the trained model in `model`. Use `--plot-training` to view training plots (this will block until you exit matplotlib, so you can't fire-and-forget with `--plot-training`). It will print the MAE/loss for train, test, and validation (for each model) before exiting:
 

@@ -10,19 +10,21 @@ from keras.layers import (
     Cropping2D,
     Input,
 )
-from nsgt import NSGT, BarkScale
+from nsgt import NSGT
 import matplotlib.pyplot as plt
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 import keras.backend as K
 from .params import (
     chunk_size,
     sample_rate,
-    stft_nfft,
-    n_frames,
+    dim_1,
+    dim_2,
     model_dir,
     checkpoint_dir,
-    conv_kernel_crop,
+    conv_kernel_crop_dim_1,
+    conv_kernel_crop_dim_2,
     components,
+    nsgt_scale,
 )
 
 physical_devices = tensorflow.config.list_physical_devices("GPU")
@@ -35,9 +37,9 @@ def _pol2cart(rho, phi):
     return real + 1j * imag
 
 
-def _create_model():
+def create_model():
     model = Sequential()
-    model.add(Input(shape=(n_frames, stft_nfft, 1)))
+    model.add(Input(shape=(dim_1, dim_2, 1)))
     model.add(Conv2D(12, kernel_size=3, activation="relu", padding="same"))
     model.add(
         MaxPooling2D(pool_size=(3, 5), strides=None, padding="same", data_format=None)
@@ -55,7 +57,9 @@ def _create_model():
     model.add(UpSampling2D(size=(3, 5), data_format=None, interpolation="nearest"))
 
     model.add(Conv2D(1, kernel_size=1, activation="relu", padding="same"))
-    model.add(Cropping2D(cropping=((0, 0), (0, conv_kernel_crop))))
+    model.add(
+        Cropping2D(cropping=((0, conv_kernel_crop_dim_1), (0, conv_kernel_crop_dim_2)))
+    )
 
     model.compile(loss="mae", optimizer="adam", metrics=["mae"])
 
@@ -75,7 +79,7 @@ class Model:
             for d in create_dirs:
                 if not os.path.isdir(d):
                     os.mkdir(d)
-            self.model = _create_model()
+            self.model = create_model()
 
         self.monitor = EarlyStopping(
             monitor="val_loss", patience=2, min_delta=0, mode="auto", verbose=1
@@ -155,13 +159,9 @@ def xtract_mixin(x, instrumental=False, single_model=False, pretrained_model_dir
     x_out_p = numpy.zeros_like(x)
     x_out_v = numpy.zeros_like(x)
 
-    # 96 bins per octave on the bark scale
-    # bark chosen as it might better represent low-frequency sounds (drums)
-    scl = BarkScale(0, 22050, 96)
-
     # calculate transform parameters
     L = chunk_size
-    nsgt = NSGT(scl, sample_rate, L, real=True, matrixform=True)
+    nsgt = NSGT(nsgt_scale, sample_rate, L, real=True, matrixform=True)
 
     for chunk in range(n_chunks - 1):
         s = x[chunk * chunk_size : (chunk + 1) * chunk_size]
@@ -171,19 +171,19 @@ def xtract_mixin(x, instrumental=False, single_model=False, pretrained_model_dir
         C = numpy.asarray(c)
 
         Cmag_orig, Cphase_orig = librosa.magphase(C)
-        Cmag_for_nn = numpy.reshape(Cmag_orig, (1, n_frames, stft_nfft, 1))
+        Cmag_for_nn = numpy.reshape(Cmag_orig, (1, dim_1, dim_2, 1))
 
         # inference from model
         Cmag_p = percussive_model.predict(Cmag_for_nn)
-        Cmag_p = numpy.reshape(Cmag_p, (n_frames, stft_nfft))
+        Cmag_p = numpy.reshape(Cmag_p, (dim_1, dim_2))
 
         Cmag_h = harmonic_model.predict(Cmag_for_nn)
-        Cmag_h = numpy.reshape(Cmag_h, (n_frames, stft_nfft))
+        Cmag_h = numpy.reshape(Cmag_h, (dim_1, dim_2))
 
         Cmag_v = numpy.zeros_like(Cmag_h)
         if not instrumental:
             Cmag_v = vocal_model.predict(Cmag_for_nn)
-            Cmag_v = numpy.reshape(Cmag_v, (n_frames, stft_nfft))
+            Cmag_v = numpy.reshape(Cmag_v, (dim_1, dim_2))
 
         if single_model:
             Ch_desired = _pol2cart(Cmag_h, Cphase_orig)

@@ -1,4 +1,5 @@
 import os
+from nsgt import BarkScale
 
 
 mypath = os.path.dirname(os.path.abspath(__file__))
@@ -28,8 +29,12 @@ components = {
 chunk_size = 44032
 sample_rate = 44100
 
-n_frames = 96
-stft_nfft = 1948
-conv_kernel_crop = 2
+dim_1 = 96
+dim_2 = 1948
+
+conv_kernel_crop_dim_1 = 0
+conv_kernel_crop_dim_2 = 2
 
 batch_size = 64
+
+nsgt_scale = BarkScale(0, 22050, 96)
