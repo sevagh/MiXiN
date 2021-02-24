@@ -229,4 +229,8 @@ def xtract_mixin(x, instrumental=False, single_model=False, pretrained_model_dir
         x_out_h = x_out_h[:-n_pad]
         x_out_v = x_out_v[:-n_pad]
 
+    x_out_h = x_out_h.astype(numpy.float32)
+    x_out_p = x_out_p.astype(numpy.float32)
+    x_out_v = x_out_v.astype(numpy.float32)
+
     return x_out_h, x_out_p, x_out_v

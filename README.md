@@ -2,13 +2,13 @@
 
 MiXiN, or **M**usic **X**traction with **N**onstationary Gabor Transforms, is a model for harmonic/percussive/vocal source separation based on [Convolutional Denoising Autoencoders](https://arxiv.org/abs/1703.08019). The pretrained models are trained on Periphery stems from the albums Juggernaut, Omega, Periphery III and Hail Stan (available for purchase [here](https://store.periphery.net/music/music)).
 
-MiXiN takes the simple [median-filtering HPSS](http://dafx10.iem.at/papers/DerryFitzGerald_DAFx10_P15.pdf) algorithm (which applies soft masks computed from harmonic and percussive magnitude estimates), replaces the STFT with an NSGT with 96 bands on the Bark frequency scale from 0-22050Hz, and replaces the simple (but not so impressive) median filtering estimation step with trained CDAEs.
+MiXiN takes the simple [median-filtering HPSS](http://dafx10.iem.at/papers/DerryFitzGerald_DAFx10_P15.pdf) algorithm (which applies soft masks computed from harmonic and percussive magnitude estimates), replaces the STFT with an NSGT using 96 bands on the Bark frequency scale (from 0-22050Hz), and replaces the simple (but not so impressive) median filtering estimation step with trained CDAEs.
 
 MiXiN has only been tested on my own Linux computer - if you experience any issues, or need help getting it running somewhere else, feel free to use GitHub issues to ask or suggest anything.
 
 ## Demo clips
 
-This demo page (sevag.xyz) contains some sound samples generated with the available pretrained models.
+https://sevag.xyz/music_separation.html contains some sound samples separated with the available pretrained models. The Periphery example was separated with default arguments. The Mestis example was separated with `--instrumental`.
 
 ## Install and use
 
