@@ -85,11 +85,13 @@ The CDAE paper uses an STFT of 15 frames with a window size of 1024 (1025 FFT po
 
 In MiXiN, the Nonstationary Gabor Transform is used with 96 bands on the Bark scale from 0-22050 Hz using [my fork](https://github.com/sevagh/nsgt) of the Python [nsgt](https://github.com/grrrr/nsgt) library. Think of the NSGT like an STFT with some useful time-frequency properties that might make it more amenable to musical applications - for further reading more musical time-frequency analyses, check out [Judith Brown's first paper on the CQT](https://www.ee.columbia.edu/~dpwe/papers/Brown91-cqt.pdf), [Monika Doerfler's dissertation](http://www.mathe.tu-freiberg.de/files/thesis/gamu_1.pdf) for a treatment of multiple Gabor dictionaries, and [paper 1](https://ltfat.github.io/notes/ltfatnote010.pdf), [paper 2](https://ltfat.github.io/notes/ltfatnote018.pdf) on NSGTs.
 
-The signal is split into chunk sizes of 44032 samples (representing roughly 1s of audio, divisible by 1024), and NSGT is taken. The magnitude of the mixed audio NSGT coefficients is the input to all of the 3 CDAEs, and the outputs are the estimates of vocal, percussive, and harmonic magnitude NSGT coefficients.
+The signal is split into chunk sizes of 44032 samples (representing roughly 1s of audio, divisible by 1024), and a forward NSGT is done on each chunk. The magnitude of the mixed audio NSGT coefficients per chunk is the input to all of the 3 CDAEs, and the outputs are the estimates of vocal, percussive, and harmonic magnitude NSGT coefficients.
 
 The original CDAE paper uses the phase of the mixture and the magnitude of the CDAE output to invert and create the separated source. The approach in MiXiN is closer to that of the HPSS formulation, where the magnitude estimates of each source (harmonic, percussive, vocal) are used to compute soft masks using the Wiener filter formula:
 
 <img src="./.github/mixin_arch.png" width="640px">
+
+Finally, the NSGT coefficient matrix of the original mixed chunk is multiplied with the respective mask and the backward NSGT gives us the harmonic, percussive, and vocal chunks (appended to the full track output).
 
 ## Training
 
@@ -99,7 +101,7 @@ As mentioned, the training data used was 4 albums from Periphery, prepared in tw
 
 A consequence is that the vocal CDAE is trained on half the data of the percussive and harmonic ones.
 
-The data is split into 80%/20%/20% train/validation/test. There are 3 models trained, with 37,000 parameters each. Ideas for the CDAE implementation was relatively clear in the paper, and helped by [this implementation](https://github.com/SahilJindal1/Sound-Separation). Here are the training plots for the 3 networks - the loss is mae.
+The data is split into 80%/20%/20% train/validation/test. There are 3 models trained, with 37,000 parameters each. The CDAE implementation is relatively clear in the paper, but I was also helped by [this implementation](https://github.com/SahilJindal1/Sound-Separation). Here are the training plots for the 3 networks - the loss is mae.
 
 Percussive:
 
