@@ -32,6 +32,11 @@ if __name__ == "__main__":
         help="use the single model approach (invert network output magnitude + original phase)",
     )
     parser.add_argument(
+        "--first-prefix",
+        action="store_true",
+        help="split on underscore in file name, use first prefix only",
+    )
+    parser.add_argument(
         "--pretrained-model-dir",
         type=str,
         default=default_pretrained,
@@ -54,6 +59,8 @@ if __name__ == "__main__":
     )
 
     song_name = os.path.splitext(os.path.basename(args.input))[0]
+    if args.first_prefix:
+        song_name = song_name.split("_")[0]
 
     harm_dest = os.path.join(args.outdir, "{0}_harmonic.wav".format(song_name))
     perc_dest = os.path.join(args.outdir, "{0}_percussive.wav".format(song_name))
