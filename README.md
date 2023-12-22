@@ -117,7 +117,7 @@ Vocal:
 
 ## Evaluation
 
-A small evaluation was performed on some tracks from the [MUSDB18-HQ](https://zenodo.org/record/3338373) test set, using the testbench from my larger [Music-Separation-TF](https://gitlab.com/sevagh/Music-Separation-TF) project (survey of various DSP approaches to source separation).
+A small evaluation was performed on some tracks from the [MUSDB18-HQ](https://zenodo.org/record/3338373) test set, using the testbench from my larger [Music-Separation-TF](https://github.com/sevagh/Music-Separation-TF) project (survey of various DSP approaches to source separation).
 
 The metric is SigSep's [BSSv4](https://github.com/sigsep/bsseval), and MiXiN is compared against [Open-Unmix](https://sigsep.github.io/open-unmix/):
 

@@ -11,7 +11,7 @@ from setuptools import find_packages, setup, Command
 # Package meta-data.
 NAME = "mixin"
 DESCRIPTION = "Music Xtraction with Nonstationary Gabor Transforms"
-URL = "https://gitlab.com/sevagh/MiXiN"
+URL = "https://github.com/sevagh/MiXiN"
 EMAIL = "sevagh@protonmail.com"
 AUTHOR = "Sevag Hanssian"
 REQUIRES_PYTHON = ">=3.8.0"
