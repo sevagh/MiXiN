@@ -6,10 +6,6 @@ MiXiN takes the simple [median-filtering HPSS](http://dafx10.iem.at/papers/Derry
 
 MiXiN has only been tested on my own Linux computer - if you experience any issues, or need help getting it running somewhere else, feel free to use GitHub issues to ask or suggest anything.
 
-## Demo clips
-
-https://sevag.xyz/music_separation.html contains some sound samples separated with the available pretrained models. The Periphery example was separated with default arguments. The Mestis example was separated with `--instrumental`.
-
 ## Install and use
 
 To install MiXiN, use the requirements.txt file (probably with a virtualenv, your choice):
